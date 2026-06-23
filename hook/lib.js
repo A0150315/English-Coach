@@ -43,12 +43,34 @@ const AIGW_URL =
   "https://aigw.nie.netease.com/v1/chat/completions";
 const MODEL = process.env.COACH_AIGW_MODEL || "deepseek-v4-flash";
 
-const SYSTEM_PROMPT =
-  "You are an English coach. Translate the user's text verbatim into idiomatic English; " +
-  "preserve all meaning, add or omit nothing. Then extract CEFR B2+ words from YOUR " +
-  "translation; give each a Chinese gloss and the example sentence. Reply as JSON only: " +
-  '{"en": "<one English sentence>", "words": [{"word": "...", "meaning_zh": "...", "example": "..."}]}. ' +
-  "If there are no B2+ words, return an empty words array.";
+// Shared extraction instruction. Positive framing ("words a B1 learner would look up") +
+// an explicit EXCLUDE list — both needed because thinking-off deepseek-v4-flash ignores
+// "skip X" negatives (it extracts the very words you tell it to skip).
+const EXTRACT_RULE =
+  "Then list ONLY words a Chinese intermediate learner (CEFR B1) would need to look up — " +
+  "genuinely unfamiliar vocabulary. EXCLUDE: basic words (update, display, function, change) " +
+  "and programming terms the user uses daily (refactor, deadlock, deploy, module, hook, " +
+  "function, variable, log, token, config). Each word: Chinese gloss + example sentence. " +
+  "Reply as JSON only: " +
+  '{"en": "<...>", "words": [{"word": "...", "meaning_zh": "...", "example": "..."}]}. ' +
+  "If there are no such words, return an empty words array.";
+
+// Two modes share one JSON shape { en, words[] } but produce `en` differently:
+// - "translate": user's Chinese → one idiomatic English sentence (faithful, verbatim)
+// - "summarize": assistant's (English) reply → one SIMPLE English summary sentence
+// `en` lands in the messages.text_en column either way.
+const PROMPTS = {
+  translate:
+    "You are an English coach. Translate the user's text verbatim into idiomatic English; " +
+    "preserve all meaning, add or omit nothing. " +
+    EXTRACT_RULE.replace('"<...>"', '"<one English sentence>"') +
+    " Extract words from YOUR translation.",
+  summarize:
+    "You are an English coach. Summarize the user's (English) text into ONE simple, plain " +
+    "English sentence a B1 learner could read — capture the key point, drop detail. " +
+    EXTRACT_RULE.replace('"<...>"', '"<one simple English summary sentence>"') +
+    " Extract words from the ORIGINAL text; quote examples from the original.",
+};
 
 /** Read the hook JSON from stdin. */
 export function readStdin() {
@@ -68,17 +90,19 @@ export function readStdin() {
 
 /**
  * Call deepseek-v4-flash with thinking OFF + json_object. One combined call.
+ * mode: "translate" (user msgs) | "summarize" (assistant msgs). Default "translate".
  * Returns { en, words: [{word, meaning_zh, example}] }.
  * Retries once on empty/invalid content (DeepSeek occasionally returns empty).
  * Throws on persistent failure — caller should swallow it so the hook never blocks.
  */
-export async function coach(text) {
+export async function coach(text, mode = "translate") {
+  const system = PROMPTS[mode] || PROMPTS.translate;
   const body = {
     model: MODEL,
     thinking: { type: "disabled" },
     response_format: { type: "json_object" },
     messages: [
-      { role: "system", content: SYSTEM_PROMPT },
+      { role: "system", content: system },
       { role: "user", content: text },
     ],
   };

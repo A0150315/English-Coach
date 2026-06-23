@@ -95,6 +95,21 @@ section h2 {
   color: #8b949e;
   font-size: 13px;
 }
+.en.summary {
+  font-style: normal;
+  color: #7ee787;
+}
+details.raw {
+  margin-top: 6px;
+}
+details.raw summary {
+  cursor: pointer;
+  color: #6e7681;
+  font-size: 11px;
+}
+details.raw > *:not(summary) {
+  margin-top: 4px;
+}
 .chips {
   margin-top: 8px;
   display: flex;

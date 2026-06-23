@@ -60,9 +60,12 @@ function renderMessages(messages) {
       const body = isUser
         ? `<div class="zh">${esc(m.text_zh)}</div>` +
           `<div class="en">${esc(m.text_en)}</div>`
-        : `<div class="raw">${esc(m.text_raw).slice(0, 300)}${
-            m.text_raw && m.text_raw.length > 300 ? "…" : ""
-          }</div>`;
+        : m.text_en
+          ? `<div class="en summary">${esc(m.text_en)}</div>` +
+            `<details class="raw"><summary>original reply</summary>${esc(m.text_raw)}</details>`
+          : `<div class="raw">${esc(m.text_raw).slice(0, 300)}${
+              m.text_raw && m.text_raw.length > 300 ? "…" : ""
+            }</div>`;
       const words = m.words
         .map((w) => `<span class="chip ${w.status}">${esc(w.word)}</span>`)
         .join("");
