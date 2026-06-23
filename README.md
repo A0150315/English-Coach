@@ -91,22 +91,26 @@ Edit `.env`:
 
 ### 5. Install as a plugin (portable across machines)
 
-This repo is itself a Claude Code plugin. Installing it as a plugin means the hooks use
-`${CLAUDE_PLUGIN_ROOT}` paths (no hardcoded `C:\Users\...`), so the same install works on any
-machine/OS.
+This repo is a Claude Code plugin **and** a plugin marketplace. Installing it via the
+marketplace means the hooks use `${CLAUDE_PLUGIN_ROOT}` paths (no hardcoded `C:\Users\...`),
+so the same install works on any machine/OS — one command, no clone, no manual path edits.
 
-**Quickest: skills-directory auto-load.** Clone/copy the repo into your skills dir:
+**Install from the GitHub marketplace (recommended):**
 
-```powershell
-git clone <repo> ~/.claude/skills/english-coach
+```
+/plugin marketplace add A0150315/English-Coach
+/plugin install english-coach@english-coach-marketplace
+/reload-plugins
 ```
 
-On the next session, Claude Code auto-discovers `.claude-plugin/plugin.json` and loads the
-hooks. No `settings.json` edit, no `/plugin install` needed. Verify with `/hooks` — you should
-see `english-coach` `UserPromptSubmit` + `Stop` hooks sourced as `Plugin`.
+Verify with `/hooks` — you should see `english-coach` `UserPromptSubmit` + `Stop` hooks sourced
+as `Plugin`. Update later with `/plugin update english-coach@english-coach-marketplace`.
 
-**Or test before committing:** `claude --plugin-dir C:\path\to\english-coach` loads it for one
-session.
+**Alternatives:**
+
+- **Skills-dir auto-load (local dev):** `git clone <repo> ~/.claude/skills/english-coach` —
+  auto-discovered next session, no install command. Good for hacking on the plugin itself.
+- **One-session test:** `claude --plugin-dir C:\path\to\english-coach`.
 
 **Secrets on a new machine:** on first hook fire, the script seeds `.env` from
 `.env.example` into the plugin's persistent data dir (`~/.claude/plugins/data/english-coach/.env`
