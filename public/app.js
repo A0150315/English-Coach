@@ -86,13 +86,13 @@ function esc(s) {
     .replace(/>/g, "&gt;");
 }
 
-// Poll every 3s when the tab is visible; pause when hidden.
+// Poll every 10s when the tab is visible; pause when hidden.
 function start() {
   if (timer) return;
   fetchRecent();
   timer = setInterval(() => {
     if (document.visibilityState === "visible") fetchRecent();
-  }, 3000);
+  }, 10000);
 }
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") fetchRecent();
