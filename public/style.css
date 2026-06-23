@@ -229,10 +229,10 @@ body.gallery header {
 }
 #labels {
   position: fixed;
-  top: 56px;
+  top: var(--header-h, 56px);
   left: 0;
   width: 100%;
-  height: calc(100vh - 56px);
+  height: calc(100vh - var(--header-h, 56px));
   pointer-events: none;
   z-index: 1;
 }
@@ -268,7 +268,7 @@ body.gallery header {
 #galaxy {
   display: block;
   position: fixed;
-  top: 56px;
+  top: var(--header-h, 56px);
   left: 0;
   cursor: grab;
 }
@@ -338,12 +338,77 @@ body.gallery header {
 }
 
 @media (max-width: 700px) {
+  header {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+  header h1 {
+    font-size: 16px;
+  }
+  nav {
+    order: 2;
+  }
+  #key-bar {
+    order: 3;
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  #key {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+  }
+  #status {
+    flex: 1 0 100%;
+    font-size: 11px;
+  }
   main {
     grid-template-columns: 1fr;
+    padding: 12px;
+    gap: 16px;
   }
+  /* let the English word shrink less aggressively so Chinese gloss has room */
+  .word .w {
+    max-width: 45%;
+  }
+  .word .g {
+    margin: 0 6px;
+  }
+  /* detail panel full-width on mobile */
   #detail {
-    width: calc(100vw - 32px);
-    right: 16px;
-    left: 16px;
+    width: calc(100vw - 24px);
+    right: 12px;
+    left: 12px;
+    top: auto;
+    bottom: 12px;
+    max-height: 60vh;
+  }
+  #hint {
+    font-size: 11px;
+    left: 12px;
+    bottom: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  header {
+    padding: 8px 10px;
+  }
+  header h1 {
+    font-size: 15px;
+  }
+  main {
+    padding: 10px;
+    gap: 12px;
+  }
+  .msg {
+    padding: 10px;
+  }
+  .word {
+    padding: 6px 8px;
+  }
+  nav a {
+    font-size: 12px;
   }
 }

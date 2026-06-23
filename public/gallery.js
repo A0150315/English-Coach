@@ -200,7 +200,10 @@ async function loadWords() {
 // --- render loop + resize ---
 function resize() {
   const w = window.innerWidth;
-  const h = window.innerHeight - 56; // minus header
+  // measure the actual header height (it wraps on mobile) instead of hardcoding 56
+  const headerH = document.querySelector("header")?.offsetHeight ?? 56;
+  document.documentElement.style.setProperty("--header-h", headerH + "px");
+  const h = window.innerHeight - headerH;
   renderer.setSize(w, h, false);
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
