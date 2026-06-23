@@ -198,8 +198,105 @@ details.raw > *:not(summary) {
   font-size: 11px;
 }
 
+/* --- nav link (shared by table + gallery headers) --- */
+nav a {
+  color: #58a6ff;
+  text-decoration: none;
+  font-size: 13px;
+  margin-left: 12px;
+  white-space: nowrap;
+}
+nav a:hover {
+  text-decoration: underline;
+}
+
+/* --- gallery view --- */
+body.gallery {
+  overflow: hidden;
+}
+body.gallery header {
+  position: relative;
+  z-index: 2;
+}
+#galaxy {
+  display: block;
+  position: fixed;
+  top: 56px;
+  left: 0;
+  cursor: grab;
+}
+#hint {
+  position: fixed;
+  bottom: 12px;
+  left: 16px;
+  color: #6e7681;
+  font-size: 12px;
+  z-index: 2;
+  pointer-events: none;
+}
+#detail {
+  position: fixed;
+  top: 70px;
+  right: 16px;
+  width: 320px;
+  max-height: 70vh;
+  overflow-y: auto;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 16px;
+  z-index: 3;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+#detail h3 {
+  margin: 0 0 6px;
+  color: #58a6ff;
+  font-size: 16px;
+}
+#detail .g {
+  color: #8b949e;
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+#detail .meaning {
+  margin-bottom: 8px;
+  line-height: 1.5;
+  font-size: 13px;
+}
+#detail .mg {
+  color: #f0883e;
+}
+#detail .ex {
+  color: #8b949e;
+  display: block;
+  font-size: 11px;
+}
+#detail .detail-loading {
+  color: #6e7681;
+  font-size: 12px;
+}
+#detail-close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  background: transparent;
+  border: none;
+  color: #8b949e;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0 4px;
+}
+#detail-close:hover {
+  color: #fff;
+}
+
 @media (max-width: 700px) {
   main {
     grid-template-columns: 1fr;
+  }
+  #detail {
+    width: calc(100vw - 32px);
+    right: 16px;
+    left: 16px;
   }
 }

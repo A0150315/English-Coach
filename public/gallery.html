@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>English Coach · Word Galaxy</title>
+    <link rel="stylesheet" href="style.css" />
+    <!-- Three.js + troika-three-text via importmap, no build step -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+          "troika-three-text": "https://unpkg.com/troika-three-text@0.49.1/dist/troika-three-text.esm.js"
+        }
+      }
+    </script>
+  </head>
+  <body class="gallery">
+    <header>
+      <h1>✦ Word Galaxy</h1>
+      <nav><a href="index.html">← Table</a></nav>
+      <div id="key-bar">
+        <input id="key" type="password" placeholder="API key" />
+        <button id="save-key">Save</button>
+        <span id="status"></span>
+      </div>
+    </header>
+
+    <canvas id="galaxy"></canvas>
+
+    <div id="detail" hidden>
+      <button id="detail-close">×</button>
+      <div id="detail-content"></div>
+    </div>
+
+    <div id="hint">drag to rotate · scroll to zoom · click a word</div>
+
+    <script type="module" src="gallery.js"></script>
+  </body>
+</html>
