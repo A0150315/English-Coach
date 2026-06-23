@@ -56,6 +56,10 @@ main {
   padding: 20px;
   max-width: 1200px;
   margin: 0 auto;
+  min-width: 0; /* allow grid to shrink below content min-content (fixes mobile overflow) */
+}
+main > section {
+  min-width: 0; /* grid items default to min-width:auto; force shrink-to-fit */
 }
 section h2 {
   font-size: 14px;
@@ -71,6 +75,9 @@ section h2 {
   background: #161b22;
   border-radius: 6px;
   border-left: 3px solid #30363d;
+  min-width: 0;
+  overflow-wrap: anywhere; /* long URLs/tokens in raw replies wrap instead of forcing width */
+  word-break: break-word;
 }
 .msg.user {
   border-left-color: #58a6ff;
