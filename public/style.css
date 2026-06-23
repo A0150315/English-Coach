@@ -218,6 +218,44 @@ body.gallery header {
   position: relative;
   z-index: 2;
 }
+#labels {
+  position: fixed;
+  top: 56px;
+  left: 0;
+  width: 100%;
+  height: calc(100vh - 56px);
+  pointer-events: none;
+  z-index: 1;
+}
+#labels .label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform: translate(-50%, -50%);
+  color: #c9d1d9;
+  font-size: 12px;
+  font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+  background: rgba(13, 17, 23, 0.6);
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  pointer-events: auto;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    font-size 0.1s,
+    color 0.1s;
+}
+#labels .label.known {
+  color: #3fb950;
+  opacity: 0.7;
+}
+#labels .label.hover {
+  color: #fff;
+  font-size: 15px;
+  background: rgba(88, 166, 255, 0.25);
+  z-index: 2;
+}
 #galaxy {
   display: block;
   position: fixed;

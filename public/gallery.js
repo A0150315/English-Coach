@@ -1,10 +1,10 @@
-// public/gallery.js — 3D Word Galaxy. Each word is a glowing point + text label.
+// public/gallery.js — 3D Word Galaxy. Each word is a glowing point + an HTML label
+// positioned by projecting its 3D coords to screen space (no troika/text-in-WebGL).
 // Size = occurrence count, color = status. Orbit to look around, hover to highlight,
 // click to expand meanings (reuses /api/word). Shares the localStorage key with the table view.
 
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { Text } from "troika-three-text";
 
 const KEY = "english_coach_key";
 let apiKey = localStorage.getItem(KEY) || "";
@@ -19,6 +19,9 @@ const STATUS_COLOR = {
 const $status = document.getElementById("status");
 const $detail = document.getElementById("detail");
 const $detailContent = document.getElementById("detail-content");
+const $labels = document.createElement("div");
+$labels.id = "labels";
+document.body.appendChild($labels);
 document.getElementById("detail-close").addEventListener("click", () => {
   $detail.hidden = true;
 });
@@ -56,7 +59,7 @@ scene.add(point);
 const wordGroup = new THREE.Group();
 scene.add(wordGroup);
 
-const stars = []; // { mesh, label, word }
+const stars = []; // { mesh, el, pos, word }
 let hovered = null;
 
 function sizeFor(count) {
@@ -65,15 +68,16 @@ function sizeFor(count) {
 }
 
 function buildGalaxy(words) {
-  // clear
+  // clear old
   for (const s of stars) {
     wordGroup.remove(s.mesh);
-    wordGroup.remove(s.label);
-    s.label.dispose();
+    s.el.remove();
   }
   stars.length = 0;
+  $labels.innerHTML = "";
 
   const n = words.length;
+  const projected = new THREE.Vector3();
   words.forEach((w, i) => {
     // distribute on a sphere shell with golden-angle spiral
     const phi = Math.acos(1 - (2 * (i + 0.5)) / n);
@@ -100,68 +104,36 @@ function buildGalaxy(words) {
     mesh.position.copy(pos);
     wordGroup.add(mesh);
 
-    // text label
-    const label = new Text();
-    label.text = w.word;
-    label.fontSize = 1.1;
-    label.color = "#c9d1d9";
-    label.anchorX = "center";
-    label.anchorY = "middle";
-    label.position.copy(pos).add(new THREE.Vector3(0, size + 0.8, 0));
-    wordGroup.add(label);
+    // HTML label, positioned each frame by projecting pos to screen
+    const el = document.createElement("div");
+    el.className = `label ${w.status}`;
+    el.textContent = w.word;
+    el.addEventListener("pointerenter", () => setHovered(star));
+    el.addEventListener("pointerleave", () => setHovered(null));
+    el.addEventListener("click", () => openDetail(w));
+    $labels.appendChild(el);
 
-    stars.push({ mesh, label, word: w, baseColor: color, baseSize: size });
+    const star = { mesh, el, pos: pos.clone(), word: w, baseSize: size };
+    stars.push(star);
+    void projected;
   });
 }
 
-// --- interaction: hover + click via raycaster ---
-const raycaster = new THREE.Raycaster();
-const pointer = new THREE.Vector2();
-let pointerActive = false;
-
-canvas.addEventListener("pointermove", (e) => {
-  const rect = canvas.getBoundingClientRect();
-  pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-  pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-  pointerActive = true;
-});
-canvas.addEventListener("pointerleave", () => {
-  pointerActive = false;
-  setHovered(null);
-});
-canvas.addEventListener("click", () => {
-  if (hovered) openDetail(hovered.word);
-});
-
+// --- interaction: hover + click ---
 function setHovered(s) {
   if (hovered === s) return;
   if (hovered) {
-    hovered.label.color = "#c9d1d9";
-    hovered.label.fontSize = 1.1;
+    hovered.el.classList.remove("hover");
     hovered.mesh.scale.setScalar(1);
   }
   hovered = s;
   if (s) {
-    s.label.color = "#ffffff";
-    s.label.fontSize = 1.6;
+    s.el.classList.add("hover");
     s.mesh.scale.setScalar(1.6);
-    canvas.style.cursor = "pointer";
     controls.autoRotate = false;
   } else {
-    canvas.style.cursor = "grab";
     controls.autoRotate = true;
   }
-}
-
-function checkHover() {
-  if (!pointerActive) return;
-  raycaster.setFromCamera(pointer, camera);
-  const meshes = stars.map((s) => s.mesh);
-  const hits = raycaster.intersectObjects(meshes);
-  setHovered(hits.length ? stars[hitIndex(hits[0].object)] : null);
-}
-function hitIndex(mesh) {
-  return stars.findIndex((s) => s.mesh === mesh);
 }
 
 async function openDetail(w) {
@@ -236,12 +208,28 @@ function resize() {
 window.addEventListener("resize", resize);
 resize();
 
+const _v = new THREE.Vector3();
+function positionLabels() {
+  const rect = canvas.getBoundingClientRect();
+  for (const s of stars) {
+    _v.copy(s.pos);
+    _v.project(camera); // to NDC (-1..1)
+    // behind camera?
+    if (_v.z > 1) {
+      s.el.style.display = "none";
+      continue;
+    }
+    const x = (_v.x * 0.5 + 0.5) * rect.width;
+    const y = (-_v.y * 0.5 + 0.5) * rect.height;
+    s.el.style.display = "";
+    s.el.style.transform = `translate(${x}px, ${y}px)`;
+  }
+}
+
 function animate() {
   requestAnimationFrame(animate);
-  checkHover();
   controls.update();
-  // labels always face the camera
-  for (const s of stars) s.label.lookAt(camera.position);
+  positionLabels();
   renderer.render(scene, camera);
 }
 

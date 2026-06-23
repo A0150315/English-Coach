@@ -47,12 +47,13 @@ const MODEL = process.env.COACH_AIGW_MODEL || "deepseek-v4-flash";
 // an explicit EXCLUDE list — both needed because thinking-off deepseek-v4-flash ignores
 // "skip X" negatives (it extracts the very words you tell it to skip).
 const EXTRACT_RULE =
-  "Then list ONLY words a Chinese intermediate learner (CEFR B1) would need to look up — " +
-  "genuinely unfamiliar vocabulary. EXCLUDE: basic words (update, display, function, change) " +
-  "and programming terms the user uses daily (refactor, deadlock, deploy, module, hook, " +
+  "Then list ONLY ENGLISH words a Chinese intermediate learner (CEFR B1) would need to look up — " +
+  "genuinely unfamiliar vocabulary. The `word` field MUST be an English word or phrase (never " +
+  "Chinese); `meaning_zh` is its Chinese gloss. EXCLUDE: basic words (update, display, function, " +
+  "change) and programming terms the user uses daily (refactor, deadlock, deploy, module, hook, " +
   "function, variable, log, token, config). Each word: Chinese gloss + example sentence. " +
   "Reply as JSON only: " +
-  '{"en": "<...>", "words": [{"word": "...", "meaning_zh": "...", "example": "..."}]}. ' +
+  '{"en": "<...>", "words": [{"word": "<English>", "meaning_zh": "<中文>", "example": "..."}]}. ' +
   "If there are no such words, return an empty words array.";
 
 // Two modes share one JSON shape { en, words[] } but produce `en` differently:
@@ -121,7 +122,15 @@ export async function coach(text, mode = "translate") {
     if (raw) {
       try {
         const parsed = JSON.parse(raw);
-        if (parsed && Array.isArray(parsed.words)) return parsed;
+        if (parsed && Array.isArray(parsed.words)) {
+          // Hard filter: drop any candidate whose `word` contains CJK characters.
+          // Catches the case where the model swaps English word <-> Chinese gloss
+          // (the prompt asks for English words, but thinking-off mode sometimes ignores that).
+          parsed.words = parsed.words.filter(
+            (w) => w.word && !/[一-鿿]/.test(w.word),
+          );
+          return parsed;
+        }
       } catch {
         // fall through to retry
       }
