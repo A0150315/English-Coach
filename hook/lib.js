@@ -2,17 +2,47 @@
 // Local Node, no deps. Reads hook JSON from stdin, calls AIGW, posts to Cloudflare,
 // emits a display-only desktop toast. Never adds anything to Claude's context.
 
-import { readFileSync, appendFileSync } from "node:fs";
+import {
+  readFileSync,
+  appendFileSync,
+  existsSync,
+  copyFileSync,
+  mkdirSync,
+} from "node:fs";
 import { join } from "node:path";
 
-// --- secrets: load .env from the repo root (parent of hook/). System env wins. ---
+// --- plugin roots (portable across machines/install methods) ---
+// CLAUDE_PLUGIN_ROOT = where this plugin lives (skills-dir, cache, or --plugin-dir).
+// CLAUDE_PLUGIN_DATA = per-plugin persistent data dir (~/.claude/plugins/data/english-coach/),
+//   survives updates, machine-independent. Secrets live here, NOT in the plugin source.
+const PLUGIN_ROOT =
+  process.env.CLAUDE_PLUGIN_ROOT || join(import.meta.dirname, "..");
+const PLUGIN_DATA = process.env.CLAUDE_PLUGIN_DATA || join(PLUGIN_ROOT);
+
+// --- secrets: load .env from PLUGIN_DATA (persists across updates).
+// On first run, seed it from <PLUGIN_ROOT>/.env.example so the user has a template to edit.
+// System env always wins over file values. Falls back to <PLUGIN_ROOT>/.env (dev/legacy).
 function loadEnv() {
-  const envPath = join(import.meta.dirname, "..", ".env");
+  let envPath = join(PLUGIN_DATA, ".env");
+  // first-run: seed from the template bundled in the plugin source
+  if (!existsSync(envPath)) {
+    const template = join(PLUGIN_ROOT, ".env.example");
+    if (existsSync(template)) {
+      try {
+        if (PLUGIN_DATA !== PLUGIN_ROOT)
+          mkdirSync(PLUGIN_DATA, { recursive: true });
+        copyFileSync(template, envPath);
+      } catch {
+        // PLUGIN_DATA not writable (e.g. plugin-in-place); fall back below
+      }
+    }
+  }
+  if (!existsSync(envPath)) envPath = join(PLUGIN_ROOT, ".env"); // dev/legacy fallback
   let text = "";
   try {
     text = readFileSync(envPath, "utf8");
   } catch {
-    return; // .env optional; fall back to system env
+    return; // no .env anywhere; fall back to system env
   }
   for (const line of text.split("\n")) {
     const m = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*)\s*$/);
@@ -22,8 +52,8 @@ function loadEnv() {
 }
 loadEnv();
 
-// --- logger: append one line per event to english-coach/hook.log. Best-effort, never throws. ---
-const LOG_PATH = join(import.meta.dirname, "..", "hook.log");
+// --- logger: append one line per event to PLUGIN_DATA/hook.log. Best-effort, never throws. ---
+const LOG_PATH = join(PLUGIN_DATA, "hook.log");
 function ts() {
   return new Date().toISOString().replace("T", " ").replace("Z", "");
 }

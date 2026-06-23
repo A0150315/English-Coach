@@ -1,0 +1,7 @@
+{
+  "name": "english-coach",
+  "displayName": "English Coach",
+  "version": "1.0.0",
+  "description": "Translate your messages to idiomatic English and mine B2+ vocabulary, with a Cloudflare D1 history viewer.",
+  "hooks": "./hooks/hooks.json"
+}

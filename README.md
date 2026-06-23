@@ -89,9 +89,38 @@ Edit `.env`:
 - `COACH_API_URL` = your real `*.pages.dev` URL (with the `-7et`-style suffix)
 - `COACH_API_KEY` = **the exact same value** you set in the dashboard
 
-### 5. Wire the hooks
+### 5. Install as a plugin (portable across machines)
 
-Add to `~/.claude/settings.json` (global, so it runs in all projects):
+This repo is itself a Claude Code plugin. Installing it as a plugin means the hooks use
+`${CLAUDE_PLUGIN_ROOT}` paths (no hardcoded `C:\Users\...`), so the same install works on any
+machine/OS.
+
+**Quickest: skills-directory auto-load.** Clone/copy the repo into your skills dir:
+
+```powershell
+git clone <repo> ~/.claude/skills/english-coach
+```
+
+On the next session, Claude Code auto-discovers `.claude-plugin/plugin.json` and loads the
+hooks. No `settings.json` edit, no `/plugin install` needed. Verify with `/hooks` — you should
+see `english-coach` `UserPromptSubmit` + `Stop` hooks sourced as `Plugin`.
+
+**Or test before committing:** `claude --plugin-dir C:\path\to\english-coach` loads it for one
+session.
+
+**Secrets on a new machine:** on first hook fire, the script seeds `.env` from
+`.env.example` into the plugin's persistent data dir (`~/.claude/plugins/data/english-coach/.env`
+on any OS). Edit that file once with your real `COACH_AIGW_TOKEN` + `COACH_API_KEY` — it
+survives plugin updates and never enters git.
+
+> **Migrating from the old manual setup?** Remove the `UserPromptSubmit` and `Stop` blocks from
+> `~/.claude/settings.json` (the plugin now provides them). Keeping both would double-fire —
+> identical handlers dedupe, but clean removal avoids confusion.
+
+<details>
+<summary>Alternative: wire hooks manually in settings.json (not portable, legacy)</summary>
+
+Add to `~/.claude/settings.json` (note the machine-specific absolute path):
 
 ```json
 {
@@ -122,8 +151,9 @@ Add to `~/.claude/settings.json` (global, so it runs in all projects):
 }
 ```
 
-Run `/hooks` in Claude Code to verify. The hooks read JSON from stdin; any error is swallowed
-(exit 0) so they never block a session.
+This hardcodes the path — only use if you can't install as a plugin.
+
+</details>
 
 ## About `COACH_API_KEY`
 
