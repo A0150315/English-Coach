@@ -16,6 +16,7 @@ document.getElementById("save-key").addEventListener("click", () => {
   localStorage.setItem(KEY, apiKey);
   $status.textContent = "saved";
   fetchRecent();
+  fetchWords();
 });
 
 async function fetchRecent() {
@@ -32,14 +33,26 @@ async function fetchRecent() {
       return;
     }
     const { messages } = await r.json();
-    render(messages);
+    renderMessages(messages);
     $status.textContent = `${messages.length} msgs · ${new Date().toLocaleTimeString()}`;
   } catch {
     $status.textContent = "offline";
   }
 }
 
-function render(messages) {
+async function fetchWords() {
+  if (!apiKey) return;
+  try {
+    const r = await fetch("/api/words", { headers: { "X-Coach-Key": apiKey } });
+    if (!r.ok) return;
+    const { words } = await r.json();
+    renderWords(words);
+  } catch {
+    // best-effort; next poll retries
+  }
+}
+
+function renderMessages(messages) {
   // Messages (newest first).
   $messages.innerHTML = messages
     .map((m) => {
@@ -60,15 +73,11 @@ function render(messages) {
       </div>`;
     })
     .join("");
+}
 
-  // Word list — dedupe across messages, newest first.
-  const seen = new Map();
-  for (const m of messages) {
-    for (const w of m.words) {
-      if (!seen.has(w.word)) seen.set(w.word, w);
-    }
-  }
-  $words.innerHTML = [...seen.values()]
+function renderWords(words) {
+  // words already come from /api/words: all words, newest-first, with count.
+  $words.innerHTML = words
     .map((w) => {
       const known = w.status === "known";
       const count = w.count || 1;
@@ -84,7 +93,7 @@ function render(messages) {
     .join("");
 }
 
-// Mark a word known (✓ button). PATCH /api/word, then re-fetch.
+// Mark a word known (✓ button). PATCH /api/word, then re-fetch the word table.
 $words.addEventListener("click", async (e) => {
   const btn = e.target.closest(".mark");
   if (!btn || btn.classList.contains("done")) return;
@@ -95,7 +104,7 @@ $words.addEventListener("click", async (e) => {
       headers: { "Content-Type": "application/json", "X-Coach-Key": apiKey },
       body: JSON.stringify({ id: Number(btn.dataset.id), status: "known" }),
     });
-    if (r.ok) fetchRecent();
+    if (r.ok) fetchWords();
   } catch {
     // best-effort; next poll will re-sync
   }
@@ -113,12 +122,19 @@ function esc(s) {
 function start() {
   if (timer) return;
   fetchRecent();
+  fetchWords();
   timer = setInterval(() => {
-    if (document.visibilityState === "visible") fetchRecent();
+    if (document.visibilityState === "visible") {
+      fetchRecent();
+      fetchWords();
+    }
   }, 10000);
 }
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible") fetchRecent();
+  if (document.visibilityState === "visible") {
+    fetchRecent();
+    fetchWords();
+  }
 });
 
 start();
