@@ -2,18 +2,14 @@
 // Reads .prompt, translates + extracts via coach(), stores, toasts the English.
 // Never blocks the session: any error is swallowed, hook exits 0 with no output.
 
-import { readStdin, coach, postJSON, emit, clip, log, started } from "./lib.js";
+import { readStdin, coach, postJSON, emit, clip, log } from "./lib.js";
 
-started("send");
 const t0 = Date.now();
 
 async function main() {
   const input = await readStdin();
   const prompt = input?.prompt;
-  if (!prompt || typeof prompt !== "string") {
-    log("send", `skip (no prompt) ${Date.now() - t0}ms`);
-    return; // nothing to do
-  }
+  if (!prompt || typeof prompt !== "string") return; // nothing to do
 
   let result;
   try {

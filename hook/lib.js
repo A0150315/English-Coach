@@ -36,10 +36,6 @@ export function log(tag, detail) {
     // logging must never break the hook
   }
 }
-/** Mark that a hook fired, even if it crashes before doing anything. */
-export function started(event) {
-  log(event, "STARTED");
-}
 
 // All config below is env-driven (read from .env or system env). Nothing is global-required.
 const AIGW_URL =
