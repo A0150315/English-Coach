@@ -46,6 +46,25 @@ export async function onRequestGet({ request, env }) {
     });
   }
 
+  // Total occurrence count per word (across ALL time, not just this window).
+  // One query, joined into the word objects below.
+  const wordIds = [...new Set(usages.map((u) => u.word_id))];
+  const counts = new Map();
+  if (wordIds.length) {
+    const ph = wordIds.map(() => "?").join(",");
+    const rows = (
+      await env.COACH_DB.prepare(
+        `SELECT word_id, COUNT(*) AS n FROM word_usages WHERE word_id IN (${ph}) GROUP BY word_id`,
+      )
+        .bind(...wordIds)
+        .all()
+    ).results;
+    for (const r of rows) counts.set(r.word_id, r.n);
+  }
+  for (const list of byMsg.values()) {
+    for (const w of list) w.count = counts.get(w.id) || 1;
+  }
+
   const result = messages.map((m) => ({
     ...m,
     words: byMsg.get(m.id) || [],

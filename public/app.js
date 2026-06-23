@@ -71,9 +71,11 @@ function render(messages) {
   $words.innerHTML = [...seen.values()]
     .map((w) => {
       const known = w.status === "known";
+      const count = w.count || 1;
       return `<div class="word ${w.status}">
           <span class="w">${esc(w.word)}</span>
           <span class="g">${esc(w.meaning_zh)}</span>
+          <span class="count" title="appeared ${count} time${count > 1 ? "s" : ""}">×${count}</span>
           <button class="mark ${known ? "done" : ""}" data-id="${w.id}" title="${
             known ? "already known" : "mark as known"
           }">${known ? "✓" : "✓?"}</button>

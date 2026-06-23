@@ -134,6 +134,12 @@ section h2 {
   flex: 1;
   margin: 0 8px;
 }
+.word .count {
+  color: #8b949e;
+  font-size: 11px;
+  min-width: 24px;
+  text-align: right;
+}
 .word.known {
   opacity: 0.5;
 }
