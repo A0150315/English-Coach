@@ -4,7 +4,10 @@
 const KEY = "english_coach_key";
 let apiKey = localStorage.getItem(KEY) || "";
 let timer = null;
-let lastCount = -1;
+// Last-seen payloads. If a poll returns identical data, skip re-rendering the DOM
+// (preserves interaction state like expanded word panels and <details>).
+let lastMessages = null;
+let lastWords = null;
 
 const $messages = document.getElementById("messages");
 const $words = document.getElementById("words");
@@ -33,7 +36,11 @@ async function fetchRecent() {
       return;
     }
     const { messages } = await r.json();
-    renderMessages(messages);
+    const sig = JSON.stringify(messages);
+    if (sig !== lastMessages) {
+      lastMessages = sig;
+      renderMessages(messages);
+    }
     $status.textContent = `${messages.length} msgs · ${new Date().toLocaleTimeString()}`;
   } catch {
     $status.textContent = "offline";
@@ -46,7 +53,11 @@ async function fetchWords() {
     const r = await fetch("/api/words", { headers: { "X-Coach-Key": apiKey } });
     if (!r.ok) return;
     const { words } = await r.json();
-    renderWords(words);
+    const sig = JSON.stringify(words);
+    if (sig !== lastWords) {
+      lastWords = sig;
+      renderWords(words);
+    }
   } catch {
     // best-effort; next poll retries
   }
