@@ -5,6 +5,5 @@
   "description": "Translate your messages to idiomatic English and mine B2+ vocabulary, with a Cloudflare D1 history viewer.",
   "author": {
     "name": "A0150315"
-  },
-  "hooks": "./hooks/hooks.json"
+  }
 }
