@@ -1,0 +1,145 @@
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+  background: #0d1117;
+  color: #c9d1d9;
+  line-height: 1.5;
+}
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  background: #161b22;
+  border-bottom: 1px solid #30363d;
+}
+header h1 {
+  margin: 0;
+  font-size: 18px;
+}
+#key-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+}
+#key {
+  padding: 4px 8px;
+  background: #0d1117;
+  color: #c9d1d9;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  width: 160px;
+}
+button {
+  padding: 4px 12px;
+  background: #238636;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+button:hover {
+  background: #2ea043;
+}
+#status {
+  color: #8b949e;
+}
+
+main {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 20px;
+  padding: 20px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+section h2 {
+  font-size: 14px;
+  color: #8b949e;
+  margin: 0 0 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.msg {
+  padding: 12px;
+  margin-bottom: 10px;
+  background: #161b22;
+  border-radius: 6px;
+  border-left: 3px solid #30363d;
+}
+.msg.user {
+  border-left-color: #58a6ff;
+}
+.msg.assistant {
+  border-left-color: #f78166;
+}
+.meta {
+  font-size: 11px;
+  color: #8b949e;
+  margin-bottom: 6px;
+}
+.zh {
+  color: #c9d1d9;
+}
+.en {
+  color: #58a6ff;
+  margin-top: 4px;
+  font-style: italic;
+}
+.raw {
+  color: #8b949e;
+  font-size: 13px;
+}
+.chips {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.chip {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #21262d;
+}
+.chip.known {
+  background: #1a3a2a;
+  color: #7ee787;
+}
+.chip.conflict {
+  background: #4a2a1a;
+  color: #ffa657;
+}
+
+.word {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: #161b22;
+  border-radius: 4px;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+.word .w {
+  color: #58a6ff;
+}
+.word .g {
+  color: #c9d1d9;
+}
+.word.conflict {
+  border-left: 2px solid #ffa657;
+}
+.word.known {
+  opacity: 0.6;
+}
+
+@media (max-width: 700px) {
+  main {
+    grid-template-columns: 1fr;
+  }
+}

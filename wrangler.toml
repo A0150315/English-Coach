@@ -1,0 +1,10 @@
+name = "english-coach"
+compatibility_date = "2024-11-01"
+pages_build_output_dir = "public"
+
+# D1 database binding. Created with:
+#   wrangler d1 create english-coach
+[[d1_databases]]
+binding = "COACH_DB"
+database_name = "english-coach"
+database_id = "9169efd5-45b6-4e69-945d-c8382439faf6"

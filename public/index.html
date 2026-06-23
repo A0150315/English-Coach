@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>English Coach</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>English Coach</h1>
+      <div id="key-bar">
+        <input id="key" type="password" placeholder="API key" />
+        <button id="save-key">Save</button>
+        <span id="status"></span>
+      </div>
+    </header>
+
+    <main>
+      <section id="history">
+        <h2>Recent messages</h2>
+        <div id="messages"></div>
+      </section>
+
+      <section id="vocab">
+        <h2>Word list</h2>
+        <div id="words"></div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
