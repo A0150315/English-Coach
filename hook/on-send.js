@@ -46,7 +46,10 @@ async function main() {
   // Toast the English translation. Display-only (suppressOutput → no context pollution).
   const toast = en ? clip(en) : "(no translation)";
   emit(toast);
-  log("send", `ok ${Date.now() - t0}ms | en="${clip(en, 80)}" | +${words.length} words`);
+  log(
+    "send",
+    `ok ${Date.now() - t0}ms | en="${clip(en, 80)}" | +${words.length} words`,
+  );
 }
 
 main().catch((e) => log("send", `UNCAUGHT: ${e?.message || e}`));

@@ -41,8 +41,11 @@ export function started(event) {
   log(event, "STARTED");
 }
 
-const AIGW_URL = "https://aigw.nie.netease.com/v1/chat/completions";
-const MODEL = "deepseek-v4-flash";
+// All config below is env-driven (read from .env or system env). Nothing is global-required.
+const AIGW_URL =
+  process.env.COACH_AIGW_URL ||
+  "https://aigw.nie.netease.com/v1/chat/completions";
+const MODEL = process.env.COACH_AIGW_MODEL || "deepseek-v4-flash";
 
 const SYSTEM_PROMPT =
   "You are an English coach. Translate the user's text verbatim into idiomatic English; " +
