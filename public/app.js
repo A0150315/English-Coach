@@ -81,7 +81,7 @@ function renderMessages(messages) {
         .map((w) => `<span class="chip ${w.status}">${esc(w.word)}</span>`)
         .join("");
       return `<div class="msg ${m.role}">
-        <div class="meta">${m.role} · ${m.created_at}</div>
+        <div class="meta">${m.role} · ${fmtLocal(m.created_at)}</div>
         ${body}
         <div class="chips">${words}</div>
       </div>`;
@@ -176,6 +176,21 @@ function esc(s) {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
+}
+
+// Convert a stored UTC ISO string to a compact local-time label.
+// Storage stays UTC (correct); only the display converts.
+function fmtLocal(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d)) return iso; // unparseable — show raw
+  return d.toLocaleString(undefined, {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
 }
 
 // Poll every 10s when the tab is visible; pause when hidden.
