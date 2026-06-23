@@ -1,6 +1,8 @@
 // hook/on-send.js — UserPromptSubmit handler (Stage 1).
-// Reads .prompt, translates + extracts via coach(), stores, toasts the English.
-// Never blocks the session: any error is swallowed, hook exits 0 with no output.
+// Reads .prompt, coaches it to idiomatic English + extracts vocab via coach().
+// The model decides whether the message needs coaching: when it returns
+// action "skip" (already idiomatic English, or contentless noise), we store and
+// toast nothing. Never blocks the session: any error is swallowed, exit 0.
 
 import { readStdin, coach, postJSON, emit, clip, log } from "./lib.js";
 
@@ -17,6 +19,16 @@ async function main() {
   } catch (e) {
     log("send", `coach FAILED: ${e.message} ${Date.now() - t0}ms`);
     return; // AIGW failed — don't block the prompt
+  }
+
+  // Model judged this message not worth coaching (already idiomatic English, or
+  // bare token/noise). Skip storage + toast entirely — no junk in the history.
+  if (result.action === "skip") {
+    log(
+      "send",
+      `skip (model: idiomatic or contentless) ${Date.now() - t0}ms | in="${clip(prompt, 60)}"`,
+    );
+    return;
   }
 
   const en = result.en || "";

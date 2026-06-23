@@ -108,28 +108,58 @@ const EXTRACT_RULE =
   "Chinese); `meaning_zh` is its Chinese gloss. EXCLUDE: basic words (update, display, function, " +
   "change) and programming terms the user uses daily (refactor, deadlock, deploy, module, hook, " +
   "function, variable, log, token, config). Each word: Chinese gloss + example sentence. " +
-  "Reply as JSON only: " +
-  '{"en": "<...>", "words": [{"word": "<English>", "meaning_zh": "<中文>", "example": "..."}]}. ' +
   "If there are no such words, return an empty words array.";
 
-// Two modes share one JSON shape { en, words[] } but produce `en` differently:
-// - "translate": user's Chinese → natural conversational English (coworker-chat style)
+// The `action` field is the gate. thinking-off deepseek-v4-flash tends to rewrite input even
+// when told not to, so the instruction is stated first and as an explicit choice.
+// - "coach": the message needs work — Chinese, Chinese-English mix, or non-idiomatic English.
+//   Provide a natural casual rewrite in `en`.
+// - "skip": the message is already idiomatic English OR carries no translatable content
+//   (bare tokens like "1", "ok", punctuation, noise). Return `en: null` — the caller will
+//   neither store nor toast it.
+const ACTION_RULE =
+  'FIRST judge the message and set the field "action" to exactly "coach" or "skip" ' +
+  "(do not use any other field name like judge/decision).\n" +
+  "  - Use \"coach\" if it is Chinese, mixes Chinese and English, or is English that is NOT " +
+  "idiomatic (stiff, literal, wrong word choice, missing articles/contractions, awkward). " +
+  "Rewrite it into how a native dev would say it in a Slack/Teams chat: casual spoken English, " +
+  "contractions (I'll, that's, gonna, kinda), short, human. NOT a formal/literal translation, " +
+  "NOT a doc sentence. Put the rewrite in `en`.\n" +
+  "  - Use \"skip\" ONLY when the message is PURE ENGLISH that is ALREADY natural and idiomatic, " +
+  "OR is pure English noise with nothing to coach (e.g. \"1\", \"ok\", \"yo\", \"thanks\", " +
+  "emojis, punctuation, code-only). Set `en` to null and `words` to []. Do NOT rewrite, do NOT " +
+  "pad, do NOT invent content.\n" +
+  "CRITICAL: NEVER skip a message that contains ANY Chinese — Chinese or Chinese-English mix is " +
+  "ALWAYS \"coach\", no matter how short. Only fully-English messages may be skipped. " +
+  "When in doubt between a short idiomatic English line and noise, prefer \"skip\".";
+
+// Mandatory output contract. The literal word "json" and the schema are required: deepseek-v4-flash
+// with response_format json_object rejects requests whose prompt lacks the word "json".
+const OUTPUT_RULE =
+  'Reply as JSON only (no prose, no markdown) with exactly this shape: ' +
+  '{"action": "coach"|"skip", "en": <string or null>, ' +
+  '"words": [{"word": "<English>", "meaning_zh": "<中文>", "example": "<sentence>"}]}. ' +
+  "Always include the words array (empty [] when none).";
+
+// Two modes share one JSON shape { action, en, words[] } but produce `en` differently:
+// - "translate": user's message → coach into idiomatic English (or skip if already good)
 // - "summarize": assistant's (English) reply → one SIMPLE English summary sentence
 // `en` lands in the messages.text_en column either way.
 const PROMPTS = {
   translate:
     "You are an English coach. The user is messaging a COWORKER in a dev team chat " +
-    "(Slack/Teams style), NOT writing documentation. Rewrite their Chinese into natural, " +
-    "casual spoken English — how a native dev would actually say it in chat: contractions " +
-    "(I'll, that's, gonna, kinda), conversational tone, short. NOT a formal/literal " +
-    "translation, NOT a doc sentence. Preserve the meaning but make it sound human. " +
-    EXTRACT_RULE.replace('"<...>"', '"<one casual English line>"') +
-    " Extract words from YOUR English line.",
+    "(Slack/Teams style), NOT writing documentation.\n" +
+    ACTION_RULE +
+    "\n" +
+    'When action is "coach", ' + EXTRACT_RULE + " Extract words from YOUR English line.\n" +
+    OUTPUT_RULE,
   summarize:
     "You are an English coach. Summarize the user's (English) text into ONE simple, plain " +
-    "English sentence a B1 learner could read — capture the key point, drop detail. " +
-    EXTRACT_RULE.replace('"<...>"', '"<one simple English summary sentence>"') +
-    " Extract words from the ORIGINAL text; quote examples from the original.",
+    "English sentence a B1 learner could read — capture the key point, drop detail. (Summary " +
+    'mode always produces a sentence, so set action to "coach" and ignore the skip rule.) ' +
+    EXTRACT_RULE +
+    " Extract words from the ORIGINAL text; quote examples from the original.\n" +
+    OUTPUT_RULE,
 };
 
 /** Read the hook JSON from stdin. */
@@ -149,13 +179,53 @@ export function readStdin() {
 }
 
 /**
+ * True if text contains any CJK ideograph (Chinese / Japanese kanji).
+ * Used by the word filter to drop candidates whose `word` is actually a Chinese
+ * gloss (the model sometimes swaps English word ↔ Chinese with thinking off).
+ */
+export function hasCJK(text) {
+  return /[一-鿿]/.test(text);
+}
+
+/**
  * Call deepseek-v4-flash with thinking OFF + json_object. One combined call.
  * mode: "translate" (user msgs) | "summarize" (assistant msgs). Default "translate".
- * Returns { en, words: [{word, meaning_zh, example}] }.
+ *
+ * translate mode returns { action, en, words }:
+ *   - action "coach": `en` is the idiomatic rewrite; store + toast it.
+ *   - action "skip":  `en` is null — input was already idiomatic English or had
+ *     no content to coach; caller stores/toasts nothing.
+ * summarize mode returns { action: "coach", en, words } (always a summary sentence).
+ * words: [{word, meaning_zh, example}].
+ *
  * Retries once on empty/invalid content (DeepSeek occasionally returns empty).
  * Throws on persistent failure — caller should swallow it so the hook never blocks.
  */
 export async function coach(text, mode = "translate") {
+  const result = await callModel(text, mode);
+  if (!result) throw new Error("coach: empty or invalid JSON after retry");
+
+  // Hard guard: a message containing Chinese must NEVER be skipped. The model occasionally
+  // skips short Chinese despite the prompt. Re-run once with a forced-coach instruction that
+  // removes the skip option entirely, so we get a real English line.
+  if (mode === "translate" && result.action === "skip" && hasCJK(text)) {
+    const forced = await callModel(
+      text +
+        "\n\n[NOTE: this message contains Chinese, so it MUST be translated to English. " +
+        'Return action "coach" with the English rewrite in `en`.]',
+      mode,
+    );
+    if (forced && forced.en) return { action: "coach", en: forced.en, words: forced.words };
+    // forced call also failed to produce English — fall back to original (skip), caller skips.
+  }
+  return result;
+}
+
+/**
+ * Inner fetch + parse. Returns { action, en, words } or null on persistent failure.
+ * Retries once on empty/invalid content (DeepSeek occasionally returns empty).
+ */
+async function callModel(text, mode = "translate") {
   const system = PROMPTS[mode] || PROMPTS.translate;
   const body = {
     model: MODEL,
@@ -186,16 +256,24 @@ export async function coach(text, mode = "translate") {
           // Catches the case where the model swaps English word <-> Chinese gloss
           // (the prompt asks for English words, but thinking-off mode sometimes ignores that).
           parsed.words = parsed.words.filter(
-            (w) => w.word && !/[一-鿿]/.test(w.word),
+            (w) => w.word && !hasCJK(w.word),
           );
-          return parsed;
+          // Normalize translate-mode "skip": force a null `en` and empty words so the
+          // caller's skip check is a single `action === "skip"` branch, regardless of what
+          // the model put in those fields. Accept `judge` too — thinking-off mode
+          // occasionally names the field "judge" instead of "action".
+          const action = parsed.action || parsed.judge;
+          if (mode === "translate" && action === "skip") {
+            return { action: "skip", en: null, words: [] };
+          }
+          return { action: "coach", en: parsed.en, words: parsed.words };
         }
       } catch {
         // fall through to retry
       }
     }
   }
-  throw new Error("coach: empty or invalid JSON after retry");
+  return null;
 }
 
 /** POST JSON to a Pages Function. Returns parsed JSON or null on failure. */
