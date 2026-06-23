@@ -19,30 +19,39 @@ const PLUGIN_ROOT =
   process.env.CLAUDE_PLUGIN_ROOT || join(import.meta.dirname, "..");
 const PLUGIN_DATA = process.env.CLAUDE_PLUGIN_DATA || join(PLUGIN_ROOT);
 
-// --- secrets: load .env from PLUGIN_DATA (persists across updates).
-// On first run, seed it from <PLUGIN_ROOT>/.env.example so the user has a template to edit.
-// System env always wins over file values. Falls back to <PLUGIN_ROOT>/.env (dev/legacy).
+// --- secrets resolution order (first existing wins):
+//   1. <PLUGIN_DATA>/.env        — persistent, machine-local real secrets (preferred)
+//   2. <PLUGIN_ROOT>/.env        — dev/legacy (repo root, or a real .env shipped in cache)
+//   3. <PLUGIN_DATA>/.env seeded from <PLUGIN_ROOT>/.env.example — first-run template
+// System env always wins over any file value.
 function loadEnv() {
-  let envPath = join(PLUGIN_DATA, ".env");
-  // first-run: seed from the template bundled in the plugin source
-  if (!existsSync(envPath)) {
+  const dataEnv = join(PLUGIN_DATA, ".env");
+  const rootEnv = join(PLUGIN_ROOT, ".env");
+
+  let envPath = null;
+  if (existsSync(dataEnv)) envPath = dataEnv;
+  else if (existsSync(rootEnv)) envPath = rootEnv;
+  else {
+    // No real .env anywhere → first run: seed a template into PLUGIN_DATA for the user to edit.
+    // (Only seed when PLUGIN_DATA is a real separate dir — never write into the plugin source.)
     const template = join(PLUGIN_ROOT, ".env.example");
-    if (existsSync(template)) {
+    if (PLUGIN_DATA !== PLUGIN_ROOT && existsSync(template)) {
       try {
-        if (PLUGIN_DATA !== PLUGIN_ROOT)
-          mkdirSync(PLUGIN_DATA, { recursive: true });
-        copyFileSync(template, envPath);
+        mkdirSync(PLUGIN_DATA, { recursive: true });
+        copyFileSync(template, dataEnv);
+        envPath = dataEnv;
       } catch {
-        // PLUGIN_DATA not writable (e.g. plugin-in-place); fall back below
+        // PLUGIN_DATA not writable; fall through to no-file
       }
     }
   }
-  if (!existsSync(envPath)) envPath = join(PLUGIN_ROOT, ".env"); // dev/legacy fallback
+  if (!envPath) return; // no .env anywhere; fall back to system env
+
   let text = "";
   try {
     text = readFileSync(envPath, "utf8");
   } catch {
-    return; // no .env anywhere; fall back to system env
+    return;
   }
   for (const line of text.split("\n")) {
     const m = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*)\s*$/);
@@ -65,6 +74,19 @@ export function log(tag, detail) {
   } catch {
     // logging must never break the hook
   }
+}
+
+// Surface a placeholder-secrets situation loudly, instead of failing with a cryptic
+// "empty JSON after retry" (which is really an AIGW 401 from the placeholder token).
+// Fires once per process; the hook still runs and exits 0.
+if (
+  (process.env.COACH_AIGW_TOKEN || "").includes("put-your") ||
+  (process.env.COACH_API_KEY || "").includes("change-me")
+) {
+  log(
+    "config",
+    `⚠ placeholder secrets detected — edit ${join(PLUGIN_DATA, ".env")} (or ${join(PLUGIN_ROOT, ".env")}) with your real COACH_AIGW_TOKEN + COACH_API_KEY`,
+  );
 }
 
 // All config below is env-driven (read from .env or system env). Nothing is global-required.

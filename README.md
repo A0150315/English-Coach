@@ -113,9 +113,18 @@ as `Plugin`. Update later with `/plugin update english-coach@english-coach-marke
 - **One-session test:** `claude --plugin-dir C:\path\to\english-coach`.
 
 **Secrets on a new machine:** on first hook fire, the script seeds `.env` from
-`.env.example` into the plugin's persistent data dir (`~/.claude/plugins/data/english-coach/.env`
-on any OS). Edit that file once with your real `COACH_AIGW_TOKEN` + `COACH_API_KEY` — it
-survives plugin updates and never enters git.
+`.env.example` into the plugin's persistent data dir. Edit that file once with your real
+`COACH_AIGW_TOKEN` + `COACH_API_KEY` — it survives plugin updates and never enters git.
+
+> **Find the exact path:** the data dir is named `{plugin}-{marketplace}`, so for this plugin
+> it's `~/.claude/plugins/data/english-coach-english-coach-marketplace/.env` (Windows:
+> `C:\Users\<you>\.claude\plugins\data\english-coach-english-coach-marketplace\.env`). The seeded
+> `.env` has **placeholder** values — you MUST edit it, or every hook silently 401s. If you forget,
+> `hook.log` in that same dir will show `⚠ placeholder secrets detected — edit <path>`.
+
+> **Tip — quick verify after editing:** send any message in Claude Code, then check the data dir's
+> `hook.log` for an `ok` line (e.g. `send | ok 1300ms | en="..."`). A `coach FAILED: empty or
+invalid JSON` line means the token is still the placeholder — re-edit `.env`.
 
 > **Migrating from the old manual setup?** Remove the `UserPromptSubmit` and `Stop` blocks from
 > `~/.claude/settings.json` (the plugin now provides them). Keeping both would double-fire —
