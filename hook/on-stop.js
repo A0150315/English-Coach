@@ -1,5 +1,5 @@
 // hook/on-stop.js — Stop handler (Stage 1).
-// Reads .last_assistant_message, extracts B2+ words via coach(), stores, toasts new/conflicts.
+// Reads .last_assistant_message, extracts B2+ words via coach(), stores, toasts new words.
 // Never blocks the session: any error is swallowed, hook exits 0 with no output.
 
 import { readStdin, coach, postJSON, emit, clip, log, started } from "./lib.js";
@@ -41,15 +41,9 @@ async function main() {
     log("stop", `api not stored (Cloudflare down? rec=${JSON.stringify(rec)})`);
   }
 
-  // Toast new words + any conflicts. Display-only.
-  const parts = [];
+  // Toast new words. Display-only.
   const newCount = summary?.new_count || 0;
-  if (newCount > 0) parts.push(`📝 +${newCount}`);
-  const conflicts = summary?.conflicts || [];
-  for (const c of conflicts.slice(0, 3)) {
-    parts.push(`⚠ ${c.word}: ${c.was}→${c.now}`);
-  }
-  emit(clip(parts.join("  ") || "no new words"));
+  emit(clip(newCount > 0 ? `📝 +${newCount}` : "no new words"));
   log(
     "stop",
     `ok ${Date.now() - t0}ms | +${words.length} candidates, new=${newCount}, conflicts=${conflicts.length}`,

@@ -25,7 +25,7 @@ export async function onRequestGet({ request, env }) {
   // Join words → usages → messages in one query.
   const usages = (
     await env.COACH_DB.prepare(
-      `SELECT w.word, w.meaning_zh, w.status, u.message_id, u.example
+      `SELECT w.id AS word_id, w.word, w.meaning_zh, w.status, u.message_id, u.example
        FROM word_usages u
        JOIN words w ON w.id = u.word_id
        WHERE u.message_id IN (${placeholders})`,
@@ -38,6 +38,7 @@ export async function onRequestGet({ request, env }) {
   for (const u of usages) {
     if (!byMsg.has(u.message_id)) byMsg.set(u.message_id, []);
     byMsg.get(u.message_id).push({
+      id: u.word_id,
       word: u.word,
       meaning_zh: u.meaning_zh,
       status: u.status,

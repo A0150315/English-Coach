@@ -119,6 +119,7 @@ section h2 {
 .word {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   padding: 8px 10px;
   background: #161b22;
   border-radius: 4px;
@@ -130,12 +131,28 @@ section h2 {
 }
 .word .g {
   color: #c9d1d9;
-}
-.word.conflict {
-  border-left: 2px solid #ffa657;
+  flex: 1;
+  margin: 0 8px;
 }
 .word.known {
-  opacity: 0.6;
+  opacity: 0.5;
+}
+.word .mark {
+  padding: 2px 8px;
+  font-size: 12px;
+  background: #21262d;
+  color: #8b949e;
+  border: 1px solid #30363d;
+}
+.word .mark:hover {
+  background: #238636;
+  color: #fff;
+}
+.word .mark.done {
+  background: #1a3a2a;
+  color: #7ee787;
+  border-color: #2ea043;
+  cursor: default;
 }
 
 @media (max-width: 700px) {

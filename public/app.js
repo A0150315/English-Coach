@@ -1,4 +1,4 @@
-// public/app.js — viewer. Polls /api/recent every 3s when the tab is focused.
+// public/app.js — viewer. Polls /api/recent every 10s when the tab is focused.
 // API key stored in localStorage after a one-time entry.
 
 const KEY = "english_coach_key";
@@ -69,15 +69,36 @@ function render(messages) {
     }
   }
   $words.innerHTML = [...seen.values()]
-    .map(
-      (w) =>
-        `<div class="word ${w.status}">
+    .map((w) => {
+      const known = w.status === "known";
+      return `<div class="word ${w.status}">
           <span class="w">${esc(w.word)}</span>
           <span class="g">${esc(w.meaning_zh)}</span>
-        </div>`,
-    )
+          <button class="mark ${known ? "done" : ""}" data-id="${w.id}" title="${
+            known ? "already known" : "mark as known"
+          }">${known ? "✓" : "✓?"}</button>
+        </div>`;
+    })
     .join("");
 }
+
+// Mark a word known (✓ button). PATCH /api/word, then re-fetch.
+$words.addEventListener("click", async (e) => {
+  const btn = e.target.closest(".mark");
+  if (!btn || btn.classList.contains("done")) return;
+  btn.disabled = true;
+  try {
+    const r = await fetch("/api/word", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "X-Coach-Key": apiKey },
+      body: JSON.stringify({ id: Number(btn.dataset.id), status: "known" }),
+    });
+    if (r.ok) fetchRecent();
+  } catch {
+    // best-effort; next poll will re-sync
+  }
+  btn.disabled = false;
+});
 
 function esc(s) {
   return (s || "")
