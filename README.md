@@ -210,25 +210,30 @@ You will not hit these. The 10s poll keeps reads near zero.
 
 ```powershell
 # Stage 1 round-trip: toasts + prints JSON, AIGW call ~0.5s
-echo '{"prompt":"帮我重构一下认证模块"}' | node hook/on-send.js
+echo '{"prompt":"帮我重构一下认证模块"}' | node plugin/hook/on-send.js
 ```
 
 Then check the viewer — the message + words appear within ~10s.
 
 ## Repo layout
 
+The repo is a **monorepo**: a `plugin/` subdir (what gets installed) + Cloudflare files at the
+root (deployed, never in the plugin cache).
+
 ```
-hook/            local Node scripts (NOT deployed) — Stage 1 (AIGW call)
-functions/api/   Cloudflare Pages Functions — Stage 2 + reads (D1)
-   _auth.js      auth check (X-Coach-Key) + helpers
-   message.js    POST insert a message
-   vocab.js      POST Stage 2: filter known + conflict check + upsert
-   recent.js     GET latest N messages joined with words (viewer polls this)
-public/          static viewer (deployed) — index.html, app.js, style.css
-schema.sql       D1 tables (messages, words, word_usages)
-wrangler.toml    D1 binding COACH_DB + project config
-.env.example     template for local secrets (copy to .env)
-hook.log         runtime log (gitignored)
+.claude-plugin/
+   marketplace.json          marketplace listing, source: "./plugin"
+plugin/                      ← ONLY this is copied into the plugin cache on install
+   .claude-plugin/plugin.json   plugin manifest
+   hooks/hooks.json             UserPromptSubmit + Stop hook defs (${CLAUDE_PLUGIN_ROOT})
+   hook/{lib,on-send,on-stop}.js   Stage 1: AIGW call, local Node, no deps
+   package.json                 "type":"module" (ESM imports)
+   .env.example                 template seeded into PLUGIN_DATA on first run
+functions/api/                Cloudflare Pages Functions — Stage 2 + reads (D1)
+   _auth.js, message.js, vocab.js, words.js, recent.js, word.js
+public/                       static viewer (deployed) — index.html, app.js, gallery.*, style.css
+schema.sql                    D1 tables (messages, words, word_usages)
+wrangler.toml                 D1 binding COACH_DB + pages_build_output_dir=public
 ```
 
 ## If something breaks

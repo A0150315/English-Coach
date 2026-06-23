@@ -51,10 +51,10 @@ button:hover {
 
 main {
   display: grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: 3fr 2fr;
   gap: 20px;
   padding: 20px;
-  max-width: 1100px;
+  max-width: 1200px;
   margin: 0 auto;
 }
 section h2 {
@@ -147,16 +147,25 @@ details.raw > *:not(summary) {
 }
 .word .w {
   color: #58a6ff;
+  flex: 0 0 auto;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .word .g {
   color: #c9d1d9;
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 0;
   margin: 0 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .word .count {
   color: #8b949e;
   font-size: 11px;
-  min-width: 24px;
+  flex: 0 0 auto;
   text-align: right;
 }
 .word.known {

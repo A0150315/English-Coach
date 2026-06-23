@@ -7,7 +7,7 @@
   "plugins": [
     {
       "name": "english-coach",
-      "source": "./",
+      "source": "./plugin",
       "description": "Translate your messages to idiomatic English and mine B2+ vocabulary, with a Cloudflare D1 history viewer."
     }
   ]
