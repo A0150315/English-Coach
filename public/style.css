@@ -117,14 +117,18 @@ section h2 {
 }
 
 .word {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  display: block;
   padding: 8px 10px;
   background: #161b22;
   border-radius: 4px;
   margin-bottom: 6px;
   font-size: 13px;
+}
+.word-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
 }
 .word .w {
   color: #58a6ff;
@@ -159,6 +163,24 @@ section h2 {
   color: #7ee787;
   border-color: #2ea043;
   cursor: default;
+}
+.word-detail {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #30363d;
+  font-size: 12px;
+}
+.word-detail .meaning {
+  margin-bottom: 6px;
+  line-height: 1.5;
+}
+.word-detail .mg {
+  color: #f0883e;
+}
+.word-detail .ex {
+  color: #8b949e;
+  display: block;
+  font-size: 11px;
 }
 
 @media (max-width: 700px) {

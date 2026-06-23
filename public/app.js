@@ -82,21 +82,67 @@ function renderWords(words) {
       const known = w.status === "known";
       const count = w.count || 1;
       return `<div class="word ${w.status}">
+        <div class="word-head" data-id="${w.id}">
           <span class="w">${esc(w.word)}</span>
           <span class="g">${esc(w.meaning_zh)}</span>
           <span class="count" title="appeared ${count} time${count > 1 ? "s" : ""}">×${count}</span>
           <button class="mark ${known ? "done" : ""}" data-id="${w.id}" title="${
             known ? "already known" : "mark as known"
           }">${known ? "✓" : "✓?"}</button>
-        </div>`;
+        </div>
+        <div class="word-detail" data-id="${w.id}" hidden></div>
+      </div>`;
     })
     .join("");
 }
+
+// Expand a word's distinct meanings on click (lazy GET /api/word).
+// Clicking the ✓ button does NOT toggle expansion.
+$words.addEventListener("click", async (e) => {
+  if (e.target.closest(".mark")) return; // ✓ button handles its own click below
+  const head = e.target.closest(".word-head");
+  if (!head) return;
+  const detail = head.nextElementSibling;
+  const id = head.dataset.id;
+
+  // Toggle closed if already open.
+  if (!detail.hidden) {
+    detail.hidden = true;
+    return;
+  }
+
+  detail.hidden = false;
+  detail.textContent = "loading…";
+  try {
+    const r = await fetch(`/api/word?id=${id}`, {
+      headers: { "X-Coach-Key": apiKey },
+    });
+    if (!r.ok) {
+      detail.textContent = "(failed to load)";
+      return;
+    }
+    const { meanings } = await r.json();
+    detail.innerHTML =
+      meanings.length === 0
+        ? "<em>(no usages)</em>"
+        : meanings
+            .map(
+              (m) =>
+                `<div class="meaning"><span class="mg">${esc(
+                  m.meaning,
+                )}</span>${m.example ? `<span class="ex">— ${esc(m.example)}</span>` : ""}</div>`,
+            )
+            .join("");
+  } catch {
+    detail.textContent = "(offline)";
+  }
+});
 
 // Mark a word known (✓ button). PATCH /api/word, then re-fetch the word table.
 $words.addEventListener("click", async (e) => {
   const btn = e.target.closest(".mark");
   if (!btn || btn.classList.contains("done")) return;
+  e.stopPropagation();
   btn.disabled = true;
   try {
     const r = await fetch("/api/word", {
