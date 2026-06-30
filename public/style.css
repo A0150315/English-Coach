@@ -50,9 +50,6 @@ button:hover {
 }
 
 main {
-  display: grid;
-  grid-template-columns: 3fr 2fr;
-  gap: 20px;
   padding: 20px;
   max-width: 1200px;
   margin: 0 auto;
@@ -60,6 +57,28 @@ main {
 }
 main > section {
   min-width: 0; /* grid items default to min-width:auto; force shrink-to-fit */
+}
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.tab {
+  background: #21262d;
+  border: 1px solid #30363d;
+  color: #c9d1d9;
+}
+.tab.active {
+  background: #238636;
+  border-color: #2ea043;
+  color: #fff;
+}
+.panel {
+  display: none;
+}
+.panel.active {
+  display: block;
 }
 section h2 {
   font-size: 14px;
@@ -106,6 +125,32 @@ section h2 {
   font-style: normal;
   color: #7ee787;
 }
+.pattern,
+.explain {
+  color: #8b949e;
+  font-size: 12px;
+  margin-top: 6px;
+}
+.steps {
+  margin: 8px 0 0;
+  padding-left: 20px;
+  color: #c9d1d9;
+  font-size: 13px;
+}
+.terms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.term {
+  background: #21262d;
+  border: 1px solid #30363d;
+  border-radius: 10px;
+  color: #c9d1d9;
+  font-size: 11px;
+  padding: 2px 8px;
+}
 details.raw {
   margin-top: 6px;
 }
@@ -133,9 +178,28 @@ details.raw > *:not(summary) {
   background: #1a3a2a;
   color: #7ee787;
 }
+.chip.ignored {
+  background: #30363d;
+  color: #8b949e;
+}
 .chip.conflict {
   background: #4a2a1a;
   color: #ffa657;
+}
+.correction {
+  padding: 12px;
+  margin-bottom: 10px;
+  background: #161b22;
+  border-left: 3px solid #58a6ff;
+  border-radius: 6px;
+  overflow-wrap: anywhere;
+}
+.correction .copy {
+  margin-top: 8px;
+}
+.empty {
+  color: #8b949e;
+  font-size: 13px;
 }
 
 .word {
@@ -185,6 +249,17 @@ details.raw > *:not(summary) {
   color: #8b949e;
   border: 1px solid #30363d;
 }
+.word .ignore {
+  padding: 2px 8px;
+  font-size: 12px;
+  background: #21262d;
+  color: #8b949e;
+  border: 1px solid #30363d;
+}
+.word .ignore:hover {
+  background: #6e7681;
+  color: #fff;
+}
 .word .mark:hover {
   background: #238636;
   color: #fff;
@@ -212,6 +287,20 @@ details.raw > *:not(summary) {
   color: #8b949e;
   display: block;
   font-size: 11px;
+}
+.template {
+  display: block;
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 10px 12px;
+  text-align: left;
+  background: #161b22;
+  border: 1px solid #30363d;
+  color: #c9d1d9;
+  border-radius: 6px;
+}
+.template:hover {
+  background: #21262d;
 }
 
 /* --- nav link (shared by table + gallery headers) --- */
@@ -371,9 +460,7 @@ body.gallery header {
     font-size: 11px;
   }
   main {
-    grid-template-columns: 1fr;
     padding: 12px;
-    gap: 16px;
   }
   /* let the English word shrink less aggressively so Chinese gloss has room */
   .word .w {

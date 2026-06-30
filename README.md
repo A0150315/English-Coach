@@ -1,14 +1,70 @@
 # English Coach Hooks
 
-Persistent translation + vocabulary tracker for Claude Code. Two hooks fire on every turn:
+Prompt Coach + Response Digest for Claude Code. Two hooks fire on every turn:
 
-- **On send** (`UserPromptSubmit`): your message is translated to idiomatic English and mined
-  for B2+ vocabulary. A desktop toast shows the English. The pair is stored.
-- **On reply done** (`Stop`): Claude's final message is mined for unfamiliar words. New and
-  conflicting words are toasted and stored.
+- **On send** (`UserPromptSubmit`): your coding prompt is polished into natural engineering
+  English, recurring mistakes are stored, and useful words are mined.
+- **On reply done** (`Stop`): Claude's final message becomes a short digest with next steps and
+  key terms. Raw assistant replies are not stored by default.
 
 A static viewer on Cloudflare Pages (backed by D1) shows the full history — your Chinese, the
 English, and a growing word list — polling every 10s.
+
+## Modes
+
+- `COACH_MODE=ai_prompt` (default): polish AI coding prompts into precise engineering English.
+- `COACH_MODE=work_chat`: polish coworker/Slack-style messages.
+- `digest`: used internally by the Stop hook to create response digests.
+
+## Privacy defaults
+
+Assistant raw text is not sent to Cloudflare unless you opt in:
+
+```env
+COACH_STORE_RAW_ASSISTANT=false
+COACH_MAX_RAW_CHARS=0
+COACH_REDACT_CODE_BLOCKS=true
+COACH_REDACT_PATHS=true
+COACH_DIGEST_MAX_NEXT_STEPS=5
+```
+
+Set `COACH_STORE_RAW_ASSISTANT=true` and a positive `COACH_MAX_RAW_CHARS` only if you want
+sanitized raw assistant text stored.
+
+## Migration 002
+
+Existing installs need the prompt-correction and digest schema:
+
+```bash
+wrangler d1 execute english-coach --file=migration-002-prompt-coach.sql --remote
+```
+
+## Examples
+
+Awkward prompt:
+
+```text
+What does effectiveEnvVars looks like?
+```
+
+Corrected:
+
+```text
+What does effectiveEnvVars look like?
+Rule: does + base verb
+```
+
+Long assistant reply becomes:
+
+```json
+{
+  "summary": "The main issue is that additionalContext is injected in the wrong place.",
+  "next_steps": ["Check where additionalContext is appended."],
+  "key_terms": [{ "term": "inject", "meaning_zh": "注入", "example": "The context is injected into the tool result." }]
+}
+```
+
+Mistake review stores original, corrected, rule, type, and explanation.
 
 ## Architecture (where each part runs)
 

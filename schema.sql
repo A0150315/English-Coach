@@ -15,9 +15,13 @@ CREATE TABLE IF NOT EXISTS words (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   word TEXT UNIQUE,
   meaning_zh TEXT,
-  status TEXT DEFAULT 'new',   -- 'new' | 'known' | 'conflict'
+  status TEXT DEFAULT 'new',   -- 'new' | 'known' | 'ignored'
   created_at TEXT,
-  updated_at TEXT
+  updated_at TEXT,
+  last_reviewed_at TEXT,
+  next_review_at TEXT,
+  review_count INTEGER DEFAULT 0,
+  difficulty INTEGER DEFAULT 3
 );
 
 CREATE TABLE IF NOT EXISTS word_usages (
@@ -32,3 +36,31 @@ CREATE TABLE IF NOT EXISTS word_usages (
 CREATE INDEX IF NOT EXISTS idx_word_usages_word ON word_usages(word_id);
 CREATE INDEX IF NOT EXISTS idx_word_usages_message ON word_usages(message_id);
 CREATE INDEX IF NOT EXISTS idx_messages_created ON messages(created_at);
+
+CREATE TABLE IF NOT EXISTS prompt_corrections (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  message_id INTEGER REFERENCES messages(id),
+  original TEXT NOT NULL,
+  corrected TEXT NOT NULL,
+  explanation TEXT,
+  pattern TEXT,
+  error_type TEXT,
+  created_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_prompt_corrections_created
+  ON prompt_corrections(created_at);
+CREATE INDEX IF NOT EXISTS idx_prompt_corrections_error_type
+  ON prompt_corrections(error_type);
+
+CREATE TABLE IF NOT EXISTS response_digests (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  message_id INTEGER REFERENCES messages(id),
+  summary TEXT,
+  next_steps_json TEXT,
+  key_terms_json TEXT,
+  created_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_response_digests_message
+  ON response_digests(message_id);

@@ -1,6 +1,6 @@
-// hook/lib.js — shared helpers for the English-coach hooks (Stage 1).
-// Local Node, no deps. Reads hook JSON from stdin, calls AIGW, posts to Cloudflare,
-// emits a display-only desktop toast. Never adds anything to Claude's context.
+// hook/lib.js - shared helpers for English Coach hooks.
+// Local Node, no deps. Reads hook JSON, calls AIGW, posts to Cloudflare,
+// emits display-only desktop toast. Never adds anything to Claude context.
 
 import {
   readFileSync,
@@ -11,33 +11,20 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 
-// --- plugin roots (portable across machines/install methods) ---
-// CLAUDE_PLUGIN_ROOT = where this plugin lives (skills-dir, cache, or --plugin-dir).
-// CLAUDE_PLUGIN_DATA = per-plugin persistent data dir (~/.claude/plugins/data/english-coach/),
-//   survives updates, machine-independent. Secrets live here, NOT in the plugin source.
 const PLUGIN_ROOT =
   process.env.CLAUDE_PLUGIN_ROOT || join(import.meta.dirname, "..");
 const PLUGIN_DATA = process.env.CLAUDE_PLUGIN_DATA || join(PLUGIN_ROOT);
 
-// --- secrets resolution order (first existing wins):
-//   1. <PLUGIN_DATA>/.env        — persistent, machine-local real secrets (preferred)
-//   2. <PLUGIN_ROOT>/.env        — real .env shipped in cache, or plugin-dir dev
-//   3. <repo-root>/.env          — dev only: when running from <repo>/plugin/hook/, the
-//                                   repo .env lives two levels up. (Plugin install never hits this.)
-//   4. <PLUGIN_DATA>/.env seeded from <PLUGIN_ROOT>/.env.example — first-run template
-// System env always wins over any file value.
 function loadEnv() {
   const dataEnv = join(PLUGIN_DATA, ".env");
   const rootEnv = join(PLUGIN_ROOT, ".env");
-  const repoEnv = join(import.meta.dirname, "..", "..", ".env"); // dev: plugin/hook → repo root
+  const repoEnv = join(import.meta.dirname, "..", "..", ".env");
 
   let envPath = null;
   if (existsSync(dataEnv)) envPath = dataEnv;
   else if (existsSync(rootEnv)) envPath = rootEnv;
   else if (existsSync(repoEnv)) envPath = repoEnv;
   else {
-    // No real .env anywhere → first run: seed a template into PLUGIN_DATA for the user to edit.
-    // (Only seed when PLUGIN_DATA is a real separate dir — never write into the plugin source.)
     const template = join(PLUGIN_ROOT, ".env.example");
     if (PLUGIN_DATA !== PLUGIN_ROOT && existsSync(template)) {
       try {
@@ -45,11 +32,11 @@ function loadEnv() {
         copyFileSync(template, dataEnv);
         envPath = dataEnv;
       } catch {
-        // PLUGIN_DATA not writable; fall through to no-file
+        // env seeding must never break hook startup
       }
     }
   }
-  if (!envPath) return; // no .env anywhere; fall back to system env
+  if (!envPath) return;
 
   let text = "";
   try {
@@ -58,111 +45,97 @@ function loadEnv() {
     return;
   }
   for (const line of text.split("\n")) {
-    const m = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*)\s*$/);
-    if (!m) continue;
-    if (!process.env[m[1]]) process.env[m[1]] = m[2].trim();
+    const match = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*)\s*$/);
+    if (!match) continue;
+    if (!process.env[match[1]]) process.env[match[1]] = match[2].trim();
   }
 }
 loadEnv();
 
-// --- logger: append one line per event to PLUGIN_DATA/hook.log. Best-effort, never throws. ---
 const LOG_PATH = join(PLUGIN_DATA, "hook.log");
+
 function ts() {
   return new Date().toISOString().replace("T", " ").replace("Z", "");
 }
-/** Append a line. Best-effort. */
+
 export function log(tag, detail) {
   try {
-    const line = `${ts()} | ${tag} | ${detail ?? ""}\n`;
-    appendFileSync(LOG_PATH, line, "utf8");
+    appendFileSync(LOG_PATH, `${ts()} | ${tag} | ${detail ?? ""}\n`, "utf8");
   } catch {
-    // logging must never break the hook
+    // logging must never break hook behavior
   }
 }
 
-// Surface a placeholder-secrets situation loudly, instead of failing with a cryptic
-// "empty JSON after retry" (which is really an AIGW 401 from the placeholder token).
-// Fires once per process; the hook still runs and exits 0.
 if (
   (process.env.COACH_AIGW_TOKEN || "").includes("put-your") ||
   (process.env.COACH_API_KEY || "").includes("change-me")
 ) {
   log(
     "config",
-    `⚠ placeholder secrets detected — edit ${join(PLUGIN_DATA, ".env")} (or ${join(PLUGIN_ROOT, ".env")}) with your real COACH_AIGW_TOKEN + COACH_API_KEY`,
+    `placeholder secrets detected; edit ${join(PLUGIN_DATA, ".env")} or ${join(PLUGIN_ROOT, ".env")}`,
   );
 }
 
-// All config below is env-driven (read from .env or system env). Nothing is global-required.
 const AIGW_URL =
   process.env.COACH_AIGW_URL ||
   "https://aigw.nie.netease.com/v1/chat/completions";
 const MODEL = process.env.COACH_AIGW_MODEL || "deepseek-v4-flash";
 
-// Shared extraction instruction. Positive framing ("words a B1 learner would look up") +
-// an explicit EXCLUDE list — both needed because thinking-off deepseek-v4-flash ignores
-// "skip X" negatives (it extracts the very words you tell it to skip).
 const EXTRACT_RULE =
-  "Then list ONLY ENGLISH words a Chinese intermediate learner (CEFR B1) would need to look up — " +
-  "genuinely unfamiliar vocabulary. The `word` field MUST be an English word or phrase (never " +
-  "Chinese); `meaning_zh` is its Chinese gloss. EXCLUDE: basic words (update, display, function, " +
-  "change) and programming terms the user uses daily (refactor, deadlock, deploy, module, hook, " +
-  "function, variable, log, token, config). Each word: Chinese gloss + example sentence. " +
-  "If there are no such words, return an empty words array.";
+  "Then list ONLY ENGLISH words a Chinese intermediate learner (CEFR B1) would need to look up. " +
+  "The `word` field MUST be an English word or phrase; `meaning_zh` is its Chinese gloss. " +
+  "EXCLUDE basic words and programming terms the user uses daily: update, display, function, " +
+  "change, refactor, deadlock, deploy, module, hook, variable, log, token, config. " +
+  "Each word needs a Chinese gloss and example sentence. If none, return an empty words array.";
 
-// The `action` field is the gate. thinking-off deepseek-v4-flash tends to rewrite input even
-// when told not to, so the instruction is stated first and as an explicit choice.
-// - "coach": the message needs work — Chinese, Chinese-English mix, or non-idiomatic English.
-//   Provide a natural casual rewrite in `en`.
-// - "skip": the message is already idiomatic English OR carries no translatable content
-//   (bare tokens like "1", "ok", punctuation, noise). Return `en: null` — the caller will
-//   neither store nor toast it.
-const ACTION_RULE =
-  'FIRST judge the message and set the field "action" to exactly "coach" or "skip" ' +
-  "(do not use any other field name like judge/decision).\n" +
-  "  - Use \"coach\" if it is Chinese, mixes Chinese and English, or is English that is NOT " +
-  "idiomatic (stiff, literal, wrong word choice, missing articles/contractions, awkward). " +
-  "Rewrite it into how a native dev would say it in a Slack/Teams chat: casual spoken English, " +
-  "contractions (I'll, that's, gonna, kinda), short, human. NOT a formal/literal translation, " +
-  "NOT a doc sentence. Put the rewrite in `en`.\n" +
-  "  - Use \"skip\" ONLY when the message is PURE ENGLISH that is ALREADY natural and idiomatic, " +
-  "OR is pure English noise with nothing to coach (e.g. \"1\", \"ok\", \"yo\", \"thanks\", " +
-  "emojis, punctuation, code-only). Set `en` to null and `words` to []. Do NOT rewrite, do NOT " +
-  "pad, do NOT invent content.\n" +
-  "CRITICAL: NEVER skip a message that contains ANY Chinese — Chinese or Chinese-English mix is " +
-  "ALWAYS \"coach\", no matter how short. Only fully-English messages may be skipped. " +
-  "When in doubt between a short idiomatic English line and noise, prefer \"skip\".";
+const PROMPT_ACTION_RULE =
+  'FIRST judge the message and set "action" to exactly "coach" or "skip". ' +
+  'Use "coach" if it is Chinese, mixes Chinese and English, or is English that is not natural. ' +
+  'Use "skip" only when it is already precise, natural engineering English or pure noise. ' +
+  "Never skip text containing Chinese. Preserve technical identifiers, file names, API names, " +
+  "CLI commands, env vars, and code symbols exactly.";
 
-// Mandatory output contract. The literal word "json" and the schema are required: deepseek-v4-flash
-// with response_format json_object rejects requests whose prompt lacks the word "json".
-const OUTPUT_RULE =
+const PROMPT_OUTPUT_RULE =
   'Reply as JSON only (no prose, no markdown) with exactly this shape: ' +
-  '{"action": "coach"|"skip", "en": <string or null>, ' +
-  '"words": [{"word": "<English>", "meaning_zh": "<中文>", "example": "<sentence>"}]}. ' +
-  "Always include the words array (empty [] when none).";
+  '{"action":"coach"|"skip","corrected":<string|null>,"explanation":<string|null>,' +
+  '"pattern":<string|null>,"error_type":<string|null>,' +
+  '"words":[{"word":"<English>","meaning_zh":"<Chinese>","example":"<sentence>"}]}. ' +
+  "Always include words array.";
 
-// Two modes share one JSON shape { action, en, words[] } but produce `en` differently:
-// - "translate": user's message → coach into idiomatic English (or skip if already good)
-// - "summarize": assistant's (English) reply → one SIMPLE English summary sentence
-// `en` lands in the messages.text_en column either way.
+const DIGEST_OUTPUT_RULE =
+  'Reply as JSON only (no prose, no markdown) with exactly this shape: ' +
+  '{"action":"digest","summary":"<short TLDR>","next_steps":["<action>"],' +
+  '"key_terms":[{"term":"<English>","meaning_zh":"<Chinese>","example":"<sentence>"}],' +
+  '"words":[{"word":"<English>","meaning_zh":"<Chinese>","example":"<sentence>"}]}. ' +
+  "Always include next_steps, key_terms, and words arrays.";
+
 const PROMPTS = {
-  translate:
-    "You are an English coach. The user is messaging a COWORKER in a dev team chat " +
-    "(Slack/Teams style), NOT writing documentation.\n" +
-    ACTION_RULE +
-    "\n" +
-    'When action is "coach", ' + EXTRACT_RULE + " Extract words from YOUR English line.\n" +
-    OUTPUT_RULE,
-  summarize:
-    "You are an English coach. Summarize the user's (English) text into ONE simple, plain " +
-    "English sentence a B1 learner could read — capture the key point, drop detail. (Summary " +
-    'mode always produces a sentence, so set action to "coach" and ignore the skip rule.) ' +
+  ai_prompt:
+    "You are an English coach for developers using AI coding agents. Polish rough prompts " +
+    "into natural, precise engineering English. Do not make the prompt casual or slangy. " +
+    "Do not use gonna, kinda, or filler. Keep intent exact. " +
+    PROMPT_ACTION_RULE +
+    ' When action is "coach", provide corrected, explanation, reusable pattern, and error_type. ' +
     EXTRACT_RULE +
-    " Extract words from the ORIGINAL text; quote examples from the original.\n" +
-    OUTPUT_RULE,
+    " Extract words from the corrected English line. " +
+    PROMPT_OUTPUT_RULE,
+  work_chat:
+    "You are an English coach. The user is messaging a coworker in a dev team chat " +
+    "(Slack/Teams style). Make it natural, polite, short, and human. Contractions are OK. " +
+    PROMPT_ACTION_RULE +
+    ' When action is "coach", provide corrected, explanation, reusable pattern, and error_type. ' +
+    EXTRACT_RULE +
+    " Extract words from the corrected English line. " +
+    PROMPT_OUTPUT_RULE,
+  digest:
+    "You are an English coach. Turn the assistant reply into a short action digest for " +
+    "a B1 English learner. Capture key point, next actions, and key terms. " +
+    "Do not include sensitive code or logs. " +
+    EXTRACT_RULE +
+    " Extract words from the original text; quote examples from the original. " +
+    DIGEST_OUTPUT_RULE,
 };
 
-/** Read the hook JSON from stdin. */
 export function readStdin() {
   return new Promise((resolve) => {
     let s = "";
@@ -178,105 +151,154 @@ export function readStdin() {
   });
 }
 
-/**
- * True if text contains any CJK ideograph (Chinese / Japanese kanji).
- * Used by the word filter to drop candidates whose `word` is actually a Chinese
- * gloss (the model sometimes swaps English word ↔ Chinese with thinking off).
- */
 export function hasCJK(text) {
-  return /[一-鿿]/.test(text);
+  return /[\u3400-\u9fff]/u.test(text || "");
 }
 
-/**
- * Call deepseek-v4-flash with thinking OFF + json_object. One combined call.
- * mode: "translate" (user msgs) | "summarize" (assistant msgs). Default "translate".
- *
- * translate mode returns { action, en, words }:
- *   - action "coach": `en` is the idiomatic rewrite; store + toast it.
- *   - action "skip":  `en` is null — input was already idiomatic English or had
- *     no content to coach; caller stores/toasts nothing.
- * summarize mode returns { action: "coach", en, words } (always a summary sentence).
- * words: [{word, meaning_zh, example}].
- *
- * Retries once on empty/invalid content (DeepSeek occasionally returns empty).
- * Throws on persistent failure — caller should swallow it so the hook never blocks.
- */
-export async function coach(text, mode = "translate") {
-  const result = await callModel(text, mode);
+export async function coachPrompt(text, mode = "ai_prompt") {
+  const safeMode = mode === "work_chat" ? "work_chat" : "ai_prompt";
+  const result = await callModel(text, safeMode);
   if (!result) throw new Error("coach: empty or invalid JSON after retry");
 
-  // Hard guard: a message containing Chinese must NEVER be skipped. The model occasionally
-  // skips short Chinese despite the prompt. Re-run once with a forced-coach instruction that
-  // removes the skip option entirely, so we get a real English line.
-  if (mode === "translate" && result.action === "skip" && hasCJK(text)) {
+  if (result.action === "skip" && hasCJK(text)) {
     const forced = await callModel(
-      text +
-        "\n\n[NOTE: this message contains Chinese, so it MUST be translated to English. " +
-        'Return action "coach" with the English rewrite in `en`.]',
-      mode,
+      `${text}\n\n[NOTE: this message contains Chinese. Return action "coach" with the English rewrite in corrected.]`,
+      safeMode,
     );
-    if (forced && forced.en) return { action: "coach", en: forced.en, words: forced.words };
-    // forced call also failed to produce English — fall back to original (skip), caller skips.
+    if (forced?.corrected) return forced;
   }
   return result;
 }
 
-/**
- * Inner fetch + parse. Returns { action, en, words } or null on persistent failure.
- * Retries once on empty/invalid content (DeepSeek occasionally returns empty).
- */
-async function callModel(text, mode = "translate") {
-  const system = PROMPTS[mode] || PROMPTS.translate;
+export async function digestResponse(text) {
+  const result = await callModel(text, "digest");
+  if (!result) throw new Error("digest: empty or invalid JSON after retry");
+  return result;
+}
+
+export async function coach(text, mode = "ai_prompt") {
+  if (mode === "translate") return coachPrompt(text, "work_chat");
+  if (mode === "summarize") {
+    const digest = await digestResponse(text);
+    return { action: "coach", en: digest.summary, words: digest.words };
+  }
+  return coachPrompt(text, mode);
+}
+
+async function callModel(text, mode = "ai_prompt") {
   const body = {
     model: MODEL,
     thinking: { type: "disabled" },
     response_format: { type: "json_object" },
     messages: [
-      { role: "system", content: system },
+      { role: "system", content: PROMPTS[mode] || PROMPTS.ai_prompt },
       { role: "user", content: text },
     ],
   };
 
   for (let attempt = 0; attempt < 2; attempt++) {
-    const r = await fetch(AIGW_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.COACH_AIGW_TOKEN}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
-    const j = await r.json();
+    let j;
+    try {
+      const r = await fetch(AIGW_URL, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${process.env.COACH_AIGW_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+      j = await r.json();
+    } catch {
+      continue;
+    }
     const raw = j?.choices?.[0]?.message?.content;
-    if (raw) {
-      try {
-        const parsed = JSON.parse(raw);
-        if (parsed && Array.isArray(parsed.words)) {
-          // Hard filter: drop any candidate whose `word` contains CJK characters.
-          // Catches the case where the model swaps English word <-> Chinese gloss
-          // (the prompt asks for English words, but thinking-off mode sometimes ignores that).
-          parsed.words = parsed.words.filter(
-            (w) => w.word && !hasCJK(w.word),
-          );
-          // Normalize translate-mode "skip": force a null `en` and empty words so the
-          // caller's skip check is a single `action === "skip"` branch, regardless of what
-          // the model put in those fields. Accept `judge` too — thinking-off mode
-          // occasionally names the field "judge" instead of "action".
-          const action = parsed.action || parsed.judge;
-          if (mode === "translate" && action === "skip") {
-            return { action: "skip", en: null, words: [] };
-          }
-          return { action: "coach", en: parsed.en, words: parsed.words };
-        }
-      } catch {
-        // fall through to retry
-      }
+    if (!raw) continue;
+
+    try {
+      const parsed = JSON.parse(raw);
+      if (!parsed || !Array.isArray(parsed.words)) continue;
+      parsed.words = filterEnglishWords(parsed.words);
+      if (mode === "digest") return normalizeDigest(parsed);
+      if ((parsed.action || parsed.judge) === "skip") return emptyPromptSkip();
+      return normalizePromptCoach(parsed);
+    } catch {
+      // fall through to retry
     }
   }
   return null;
 }
 
-/** POST JSON to a Pages Function. Returns parsed JSON or null on failure. */
+function filterEnglishWords(words) {
+  return words.filter((w) => w?.word && !hasCJK(w.word));
+}
+
+function emptyPromptSkip() {
+  return {
+    action: "skip",
+    corrected: null,
+    explanation: null,
+    pattern: null,
+    error_type: null,
+    words: [],
+  };
+}
+
+function normalizePromptCoach(parsed) {
+  return {
+    action: "coach",
+    corrected: parsed.corrected ?? parsed.en ?? null,
+    explanation: parsed.explanation ?? null,
+    pattern: parsed.pattern ?? null,
+    error_type: parsed.error_type ?? null,
+    words: parsed.words,
+  };
+}
+
+function normalizeDigest(parsed) {
+  const maxSteps = Number(process.env.COACH_DIGEST_MAX_NEXT_STEPS || 5);
+  const nextSteps = Array.isArray(parsed.next_steps) ? parsed.next_steps : [];
+  return {
+    action: "digest",
+    summary: parsed.summary ?? parsed.en ?? "",
+    next_steps: nextSteps.slice(0, Number.isFinite(maxSteps) ? maxSteps : 5),
+    key_terms: Array.isArray(parsed.key_terms) ? parsed.key_terms : [],
+    words: parsed.words,
+  };
+}
+
+export function redactCodeBlocks(text) {
+  let index = 0;
+  return String(text || "").replace(/```[\s\S]*?```/g, () => {
+    index += 1;
+    return `[CODE_BLOCK_${index}]`;
+  });
+}
+
+export function redactPaths(text) {
+  return String(text || "")
+    .replace(/[A-Za-z]:\\(?:[^\\\s:"<>|?*]+\\)*[^\\\s:"<>|?*]+/g, "[FILE_PATH]")
+    .replace(/(^|[\s("'=])\/(?:[\w.-]+\/)+[\w.-]+\.[A-Za-z0-9]+/g, "$1[FILE_PATH]")
+    .replace(/\b(?:src|lib|app|pages|functions|plugin|public)\/[\w./-]+\.[A-Za-z0-9]+\b/g, "[FILE_PATH]");
+}
+
+export function truncateText(text, maxChars) {
+  const limit = Number(maxChars);
+  const value = String(text || "");
+  if (!Number.isFinite(limit) || limit <= 0) return "";
+  return value.length > limit ? value.slice(0, limit) : value;
+}
+
+export function sanitizeAssistantText(text) {
+  let value = String(text || "");
+  if ((process.env.COACH_REDACT_CODE_BLOCKS ?? "true") !== "false") {
+    value = redactCodeBlocks(value);
+  }
+  if ((process.env.COACH_REDACT_PATHS ?? "true") !== "false") {
+    value = redactPaths(value);
+  }
+  return value;
+}
+
 export async function postJSON(path, payload) {
   const base = (process.env.COACH_API_URL || "").replace(/\/$/, "");
   if (!base) return null;
@@ -295,18 +317,14 @@ export async function postJSON(path, payload) {
   }
 }
 
-/**
- * Build the hook JSON output carrying a desktop toast (OSC 9).
- * Display-only: suppressOutput keeps stdout out of Claude's context.
- */
 export function emit(toast) {
-  const esc = `\x1b]9;EN Coach;${toast}\x07`; // OSC 9 ; title ; body BEL
+  const esc = `\x1b]9;EN Coach;${toast}\x07`;
   process.stdout.write(
     JSON.stringify({ terminalSequence: esc, suppressOutput: true }),
   );
 }
 
-/** Truncate a string for a toast (Windows Terminal toast bodies are short). */
 export function clip(s, n = 200) {
-  return s.length > n ? s.slice(0, n - 1) + "…" : s;
+  const value = String(s || "");
+  return value.length > n ? `${value.slice(0, n - 1)}...` : value;
 }

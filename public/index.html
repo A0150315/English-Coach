@@ -9,7 +9,7 @@
   <body>
     <header>
       <h1>English Coach</h1>
-      <nav><a href="gallery.html">✦ Gallery</a></nav>
+      <nav><a href="gallery.html">Gallery</a></nav>
       <div id="key-bar">
         <input id="key" type="password" placeholder="API key" />
         <button id="save-key">Save</button>
@@ -18,14 +18,31 @@
     </header>
 
     <main>
-      <section id="history">
-        <h2>Recent messages</h2>
+      <div class="tabs" role="tablist" aria-label="English Coach sections">
+        <button class="tab active" data-tab="today">Today</button>
+        <button class="tab" data-tab="mistakes">Mistakes</button>
+        <button class="tab" data-tab="vocab">Vocabulary</button>
+        <button class="tab" data-tab="library">Prompt Library</button>
+      </div>
+
+      <section id="today" class="panel active">
+        <h2>Today</h2>
         <div id="messages"></div>
       </section>
 
-      <section id="vocab">
-        <h2>Word list</h2>
+      <section id="mistakes" class="panel">
+        <h2>Mistakes</h2>
+        <div id="corrections"></div>
+      </section>
+
+      <section id="vocab" class="panel">
+        <h2>Vocabulary</h2>
         <div id="words"></div>
+      </section>
+
+      <section id="library" class="panel">
+        <h2>Prompt Library</h2>
+        <div id="prompt-library"></div>
       </section>
     </main>
 

@@ -4,7 +4,7 @@
 
 import { authed, json, now, normalizeMeaning } from "./_auth.js";
 
-const ALLOWED = new Set(["new", "known"]);
+const ALLOWED = new Set(["new", "known", "ignored"]);
 
 // GET ?id=X → distinct meanings (deduped by normalized meaning) with one example each.
 export async function onRequestGet({ request, env }) {
@@ -47,7 +47,7 @@ export async function onRequestPatch({ request, env }) {
 
   const { id, status } = body;
   if (!id || !ALLOWED.has(status)) {
-    return json({ error: "id and status ('new'|'known') required" }, 400);
+    return json({ error: "id and status ('new'|'known'|'ignored') required" }, 400);
   }
 
   await env.COACH_DB.prepare(

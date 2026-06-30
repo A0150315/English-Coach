@@ -1,8 +1,16 @@
-// hook/on-stop.js — Stop handler (Stage 1).
-// Reads .last_assistant_message, summarizes it into plain English + extracts B2+ words,
-// stores, toasts new words. Never blocks the session: any error swallowed, exit 0.
+// hook/on-stop.js - Stop handler.
+// Digests assistant reply, stores digest + vocab. Raw text storage is opt-in.
 
-import { readStdin, coach, postJSON, emit, clip, log } from "./lib.js";
+import {
+  readStdin,
+  digestResponse,
+  postJSON,
+  emit,
+  clip,
+  log,
+  sanitizeAssistantText,
+  truncateText,
+} from "./lib.js";
 
 const t0 = Date.now();
 
@@ -11,26 +19,35 @@ async function main() {
   const msg = input?.last_assistant_message;
   if (!msg || typeof msg !== "string" || !msg.trim()) return;
 
+  const sanitized = sanitizeAssistantText(msg);
   let result;
   try {
-    result = await coach(msg, "summarize");
+    result = await digestResponse(sanitized);
   } catch (e) {
-    log("stop", `coach FAILED: ${e.message} ${Date.now() - t0}ms`);
-    return; // AIGW failed — don't block
+    log("stop", `digest FAILED: ${e.message} ${Date.now() - t0}ms`);
+    return;
   }
 
   const words = Array.isArray(result.words) ? result.words : [];
-  const summaryEn = result.en || "";
+  const summary = result.summary || "";
+  const rawText = getStoredRawText(sanitized);
 
   const rec = await postJSON("/api/message", {
     role: "assistant",
-    text_raw: msg,
-    text_en: summaryEn, // reuse the column: stores the plain-English summary
+    text_en: summary,
+    text_raw: rawText,
     session_id: input.session_id || null,
   });
-  let summary = { new_count: 0 };
+
+  let vocabSummary = { new_count: 0 };
   if (rec?.id) {
-    summary = await postJSON("/api/vocab", {
+    await postJSON("/api/digest", {
+      message_id: rec.id,
+      summary,
+      next_steps: result.next_steps || [],
+      key_terms: result.key_terms || [],
+    });
+    vocabSummary = await postJSON("/api/vocab", {
       message_id: rec.id,
       candidates: words,
       source: "assistant",
@@ -39,13 +56,26 @@ async function main() {
     log("stop", `api not stored (Cloudflare down? rec=${JSON.stringify(rec)})`);
   }
 
-  // Toast new words. Display-only.
-  const newCount = summary?.new_count || 0;
-  emit(clip(newCount > 0 ? `📝 +${newCount}` : "no new words"));
+  const newCount = vocabSummary?.new_count || 0;
+  emit(clip(summary.length <= 140 ? `TL;DR: ${summary}` : `new words: ${newCount}`));
   log(
     "stop",
-    `ok ${Date.now() - t0}ms | +${newCount} new | summary="${clip(summaryEn, 60)}"`,
+    `ok ${Date.now() - t0}ms | +${newCount} new | summary="${clip(summary, 60)}"`,
   );
+}
+
+function getStoredRawText(sanitized) {
+  if (process.env.COACH_STORE_RAW_ASSISTANT !== "true") {
+    log("stop", "raw assistant storage disabled");
+    return null;
+  }
+
+  const maxChars = Number(process.env.COACH_MAX_RAW_CHARS ?? 0);
+  const rawText = truncateText(sanitized, maxChars);
+  if (rawText.length < sanitized.length) {
+    log("stop", `raw assistant storage truncated to ${rawText.length} chars`);
+  }
+  return rawText || null;
 }
 
 main().catch((e) => log("stop", `UNCAUGHT: ${e?.message || e}`));
