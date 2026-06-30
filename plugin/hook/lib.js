@@ -265,6 +265,8 @@ function emptyPromptSkip() {
 }
 
 function shouldDoubleCheckEnglishSkip(text) {
+  if ((process.env.COACH_DOUBLE_CHECK_SKIP ?? "true") === "false") return false;
+
   const words = String(text || "").match(/[A-Za-z]+/g) || [];
   if (words.length < 3) return false;
   const normalized = words.join(" ").toLowerCase();

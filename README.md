@@ -23,13 +23,20 @@ Assistant raw text is not sent to Cloudflare unless you opt in:
 ```env
 COACH_STORE_RAW_ASSISTANT=false
 COACH_MAX_RAW_CHARS=0
+COACH_REDACT_BEFORE_DIGEST=false
+COACH_REDACT_BEFORE_STORAGE=true
 COACH_REDACT_CODE_BLOCKS=true
 COACH_REDACT_PATHS=true
 COACH_DIGEST_MAX_NEXT_STEPS=5
+COACH_DOUBLE_CHECK_SKIP=true
 ```
 
 Set `COACH_STORE_RAW_ASSISTANT=true` and a positive `COACH_MAX_RAW_CHARS` only if you want
 sanitized raw assistant text stored.
+
+`COACH_REDACT_BEFORE_DIGEST=false` keeps full local/AIGW context for better summaries.
+`COACH_REDACT_BEFORE_STORAGE=true` keeps Cloudflare storage redacted.
+Set `COACH_DOUBLE_CHECK_SKIP=false` if prompt sending feels slow.
 
 ## Migration 002
 
@@ -38,6 +45,9 @@ Existing installs need the prompt-correction and digest schema:
 ```bash
 wrangler d1 execute english-coach --file=migration-002-prompt-coach.sql --remote
 ```
+
+Run `migration-002-prompt-coach.sql` once only. It uses `ALTER TABLE ADD COLUMN`, so repeating
+it will fail with a column-already-exists error.
 
 ## Examples
 

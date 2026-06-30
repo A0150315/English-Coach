@@ -19,10 +19,10 @@ async function main() {
   const msg = input?.last_assistant_message;
   if (!msg || typeof msg !== "string" || !msg.trim()) return;
 
-  const sanitized = sanitizeAssistantText(msg);
+  const digestInput = getDigestInput(msg);
   let result;
   try {
-    result = await digestResponse(sanitized);
+    result = await digestResponse(digestInput);
   } catch (e) {
     log("stop", `digest FAILED: ${e.message} ${Date.now() - t0}ms`);
     return;
@@ -30,7 +30,7 @@ async function main() {
 
   const words = Array.isArray(result.words) ? result.words : [];
   const summary = result.summary || "";
-  const rawText = getStoredRawText(sanitized);
+  const rawText = getStoredRawText(msg);
 
   const rec = await postJSON("/api/message", {
     role: "assistant",
@@ -64,15 +64,27 @@ async function main() {
   );
 }
 
-function getStoredRawText(sanitized) {
+function getDigestInput(msg) {
+  if (process.env.COACH_REDACT_BEFORE_DIGEST === "true") {
+    log("stop", "assistant text redacted before digest");
+    return sanitizeAssistantText(msg);
+  }
+  return msg;
+}
+
+function getStoredRawText(msg) {
   if (process.env.COACH_STORE_RAW_ASSISTANT !== "true") {
     log("stop", "raw assistant storage disabled");
     return null;
   }
 
+  const storageText =
+    (process.env.COACH_REDACT_BEFORE_STORAGE ?? "true") === "false"
+      ? msg
+      : sanitizeAssistantText(msg);
   const maxChars = Number(process.env.COACH_MAX_RAW_CHARS ?? 0);
-  const rawText = truncateText(sanitized, maxChars);
-  if (rawText.length < sanitized.length) {
+  const rawText = truncateText(storageText, maxChars);
+  if (rawText.length < storageText.length) {
     log("stop", `raw assistant storage truncated to ${rawText.length} chars`);
   }
   return rawText || null;

@@ -1,7 +1,7 @@
 {
   "name": "english-coach",
   "displayName": "English Coach",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "Polish AI coding prompts, digest assistant replies, and track English learning data with a Cloudflare D1 viewer.",
   "author": {
     "name": "A0150315"
