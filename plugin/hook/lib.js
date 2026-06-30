@@ -162,7 +162,7 @@ export function hasCJK(text) {
 
 export async function coachPrompt(text, mode = "ai_prompt") {
   const safeMode = mode === "work_chat" ? "work_chat" : "ai_prompt";
-  const result = await callModel(text, safeMode);
+  let result = await callModel(text, safeMode);
   if (!result) throw new Error("coach: empty or invalid JSON after retry");
 
   if (result.action === "skip" && hasCJK(text)) {
@@ -171,6 +171,13 @@ export async function coachPrompt(text, mode = "ai_prompt") {
       safeMode,
     );
     if (forced?.corrected) return forced;
+  }
+
+  if (result.action === "skip" && shouldDoubleCheckEnglishSkip(text)) {
+    result = await callModel(
+      `${text}\n\n[NOTE: Double-check this English prompt. If it has ANY spelling, grammar, or word-choice error, return action "coach" with corrected English. Only return "skip" if the sentence is already fully natural and correct.]`,
+      safeMode,
+    );
   }
   return result;
 }
@@ -256,6 +263,22 @@ function emptyPromptSkip() {
     words: [],
   };
 }
+
+function shouldDoubleCheckEnglishSkip(text) {
+  const words = String(text || "").match(/[A-Za-z]+/g) || [];
+  if (words.length < 3) return false;
+  const normalized = words.join(" ").toLowerCase();
+  return !SHORT_SAFE_SKIPS.has(normalized);
+}
+
+const SHORT_SAFE_SKIPS = new Set([
+  "all good",
+  "looks good",
+  "thank you",
+  "thanks a lot",
+  "got it",
+  "sounds good",
+]);
 
 function normalizePromptCoach(parsed) {
   return {
