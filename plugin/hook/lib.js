@@ -104,10 +104,11 @@ const PROMPT_OUTPUT_RULE =
 
 const DIGEST_OUTPUT_RULE =
   'Reply as JSON only (no prose, no markdown) with exactly this shape: ' +
-  '{"action":"digest","summary":"<short TLDR>","next_steps":["<action>"],' +
+  '{"action":"digest","summary":"<short English TLDR>","next_steps":["<English action>"],' +
   '"key_terms":[{"term":"<English>","meaning_zh":"<Chinese>","example":"<sentence>"}],' +
   '"words":[{"word":"<English>","meaning_zh":"<Chinese>","example":"<sentence>"}]}. ' +
-  "Always include next_steps, key_terms, and words arrays.";
+  "Always include next_steps, key_terms, and words arrays. Except meaning_zh, all output " +
+  "fields MUST be English.";
 
 const PROMPTS = {
   ai_prompt:
@@ -129,10 +130,14 @@ const PROMPTS = {
     PROMPT_OUTPUT_RULE,
   digest:
     "You are an English coach. Turn the assistant reply into a short action digest for " +
-    "a B1 English learner. Capture key point, next actions, and key terms. " +
+    "a B1 English learner. Write the summary and next_steps in simple English only. " +
+    "Capture key point, next actions, and key terms. " +
     "Do not include sensitive code or logs. " +
+    "Never write Chinese in summary, next_steps, term, example, words.word, or words.example. " +
+    "Only meaning_zh may contain Chinese. If the original text is Chinese, translate the digest " +
+    "and examples into simple English. " +
     EXTRACT_RULE +
-    " Extract words from the original text; quote examples from the original. " +
+    " Extract words from the original text; write examples in simple English. " +
     DIGEST_OUTPUT_RULE,
 };
 
@@ -171,8 +176,17 @@ export async function coachPrompt(text, mode = "ai_prompt") {
 }
 
 export async function digestResponse(text) {
-  const result = await callModel(text, "digest");
+  let result = await callModel(text, "digest");
+  if (hasChineseDigest(result)) {
+    result = await callModel(
+      `${text}\n\n[NOTE: Retry. The digest was not English. Return summary, next_steps, term, example, words.word, and words.example in English only. Only meaning_zh may be Chinese.]`,
+      "digest",
+    );
+  }
   if (!result) throw new Error("digest: empty or invalid JSON after retry");
+  if (hasChineseDigest(result)) {
+    throw new Error("digest: model returned non-English digest");
+  }
   return result;
 }
 
@@ -261,9 +275,26 @@ function normalizeDigest(parsed) {
     action: "digest",
     summary: parsed.summary ?? parsed.en ?? "",
     next_steps: nextSteps.slice(0, Number.isFinite(maxSteps) ? maxSteps : 5),
-    key_terms: Array.isArray(parsed.key_terms) ? parsed.key_terms : [],
+    key_terms: filterEnglishTerms(parsed.key_terms),
     words: parsed.words,
   };
+}
+
+function filterEnglishTerms(keyTerms) {
+  if (!Array.isArray(keyTerms)) return [];
+  return keyTerms.filter((term) => term?.term && !hasCJK(term.term));
+}
+
+function hasChineseDigest(result) {
+  if (!result) return false;
+  const fields = [
+    result.summary,
+    ...(Array.isArray(result.next_steps) ? result.next_steps : []),
+    ...(Array.isArray(result.key_terms)
+      ? result.key_terms.flatMap((term) => [term.term, term.example])
+      : []),
+  ];
+  return fields.some((field) => hasCJK(field));
 }
 
 export function redactCodeBlocks(text) {

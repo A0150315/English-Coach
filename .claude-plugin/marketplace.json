@@ -3,12 +3,12 @@
   "owner": {
     "name": "A0150315"
   },
-  "description": "English Coach — translate your Claude Code messages to idiomatic English and track B2+ vocabulary.",
+  "description": "English Coach - polish AI coding prompts, digest assistant replies, and track vocabulary.",
   "plugins": [
     {
       "name": "english-coach",
       "source": "./plugin",
-      "description": "Translate your messages to idiomatic English and mine B2+ vocabulary, with a Cloudflare D1 history viewer."
+      "description": "Polish AI coding prompts, digest assistant replies, and track English learning data with a Cloudflare D1 viewer."
     }
   ]
 }

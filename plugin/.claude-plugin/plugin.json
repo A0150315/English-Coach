@@ -1,8 +1,8 @@
 {
   "name": "english-coach",
   "displayName": "English Coach",
-  "version": "1.0.5",
-  "description": "Translate your messages to idiomatic English and mine B2+ vocabulary, with a Cloudflare D1 history viewer.",
+  "version": "1.0.6",
+  "description": "Polish AI coding prompts, digest assistant replies, and track English learning data with a Cloudflare D1 viewer.",
   "author": {
     "name": "A0150315"
   }
